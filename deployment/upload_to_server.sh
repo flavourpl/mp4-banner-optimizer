@@ -14,9 +14,9 @@
 # ===== KONFIGURACJA SERWERA =====
 # Edytuj te wartości!
 
-SERVER_USER="twoj_username"              # Twój username SSH
-SERVER_HOST="twoj_serwer.com"            # Adres serwera
-SERVER_PATH="/public_html"               # Ścieżka do katalogu głównego (zmień jeśli potrzeba)
+SERVER_USER="ars"              # Twój username SSH
+SERVER_HOST="flavour.civ.pl"            # Adres serwera
+SERVER_PATH="/home/ars//mp4-video-banner-optimizer"               # Ścieżka do katalogu głównego (zmień jeśli potrzeba)
 # ============================================
 
 echo "🚀 Automatyczny upload MP4 Banner Optimizer na serwer"
