@@ -183,6 +183,121 @@
             color: #666;
         }
 
+        .preview-container {
+            position: relative;
+            width: 100px;
+            height: 60px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .preview-container:hover {
+            transform: scale(1.1);
+        }
+
+        .preview-thumbnail {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preview-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            color: #999;
+        }
+
+        .video-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-modal.active {
+            display: flex;
+        }
+
+        .video-content {
+            max-width: 90%;
+            max-height: 90%;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .video-content video {
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 5px;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 2em;
+            cursor: pointer;
+            color: #666;
+            z-index: 1;
+        }
+
+        .close-modal:hover {
+            color: #000;
+        }
+
+        .video-info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .video-info h4 {
+            margin-bottom: 10px;
+            color: #1e3c72;
+        }
+
+        .compare-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .stat-box small {
+            display: block;
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        .stat-box strong {
+            display: block;
+            font-size: 1.1em;
+            color: #1e3c72;
+        }
+
         .refresh-btn {
             background: #1e3c72;
             color: white;
@@ -255,6 +370,7 @@
             <table>
                 <thead>
                     <tr>
+                        <th>Preview</th>
                         <th>Job ID</th>
                         <th>Filename</th>
                         <th>Upload Time</th>
@@ -268,6 +384,17 @@
                 <tbody>
                     {% for upload in uploads %}
                     <tr>
+                        <td>
+                            {% if upload.has_output %}
+                                <div class="preview-container" onclick="openVideoModal('{{ upload.job_id }}', '{{ upload.filename }}')">
+                                    <img src="/admin/thumbnail/{{ upload.job_id }}" class="preview-thumbnail" alt="Preview" onerror="this.parentElement.innerHTML='<div class=\\'preview-placeholder\\'>▶</div>'">
+                                </div>
+                            {% else %}
+                                <div class="preview-container">
+                                    <div class="preview-placeholder">⏳</div>
+                                </div>
+                            {% endif %}
+                        </td>
                         <td><code>{{ upload.job_id[:8] }}...</code></td>
                         <td>{{ upload.filename }}</td>
                         <td class="timestamp">{{ upload.upload_time|timestamp_format }}</td>
@@ -301,8 +428,8 @@
                             {% if upload.has_report %}
                                 <a href="/api/report/{{ upload.job_id }}" class="btn btn-info btn-small">📊 Report</a>
                             {% endif %}
-                            {% if upload.report_data and upload.report_data.get('iterations') %}
-                                <button class="btn btn-primary btn-small" onclick="showDetails('{{ upload.job_id }}')">🔍 Details</button>
+                            {% if upload.has_output %}
+                                <button class="btn btn-primary btn-small" onclick="openCompareModal('{{ upload.job_id }}')">🔄 Compare</button>
                             {% endif %}
                         </td>
                     </tr>
@@ -330,10 +457,122 @@
         </div>
     </div>
 
+    <!-- Video Preview Modal -->
+    <div id="videoModal" class="video-modal">
+        <div class="video-content">
+            <span class="close-modal" onclick="closeVideoModal()">&times;</span>
+            <h3 id="videoTitle">Video Preview</h3>
+            <video id="modalVideo" controls>
+                Your browser does not support the video tag.
+            </video>
+            <div class="video-info">
+                <p><strong>Note:</strong> This is the optimized version of the video.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compare Modal -->
+    <div id="compareModal" class="video-modal">
+        <div class="video-content" style="max-width: 600px;">
+            <span class="close-modal" onclick="closeCompareModal()">&times;</span>
+            <h3>🔄 File Comparison</h3>
+            <div class="video-info">
+                <h4>Size Comparison</h4>
+                <div class="compare-stats">
+                    <div class="stat-box">
+                        <small>Original</small>
+                        <strong id="compareOriginalSize">-</strong>
+                    </div>
+                    <div class="stat-box">
+                        <small>Optimized</small>
+                        <strong id="compareOptimizedSize">-</strong>
+                    </div>
+                    <div class="stat-box">
+                        <small>Saved</small>
+                        <strong id="compareSaved">-</strong>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <strong>Compression: <span id="compareRatio">-</span></strong>
+                </div>
+                <div style="margin-top: 10px;">
+                    <small>Original Resolution: <span id="compareOriginalRes">-</span></small><br>
+                    <small>Optimized Resolution: <span id="compareOptimizedRes">-</span></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function showDetails(jobId) {
             const url = `/api/report/${jobId}`;
             window.open(url, '_blank');
+        }
+
+        function openVideoModal(jobId, filename) {
+            const modal = document.getElementById('videoModal');
+            const video = document.getElementById('modalVideo');
+            const videoTitle = document.getElementById('videoTitle');
+
+            video.src = `/api/download/${jobId}`;
+            videoTitle.textContent = filename;
+            modal.classList.add('active');
+        }
+
+        function closeVideoModal() {
+            const modal = document.getElementById('videoModal');
+            const video = document.getElementById('modalVideo');
+
+            modal.classList.remove('active');
+            video.pause();
+            video.src = '';
+        }
+
+        function openCompareModal(jobId) {
+            fetch(`/admin/compare/${jobId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    const originalSize = data.original.size_kb;
+                    const optimizedSize = data.optimized.size_kb;
+                    const ratio = data.compression.ratio_percent;
+                    const saved = data.compression.saved_kb;
+
+                    document.getElementById('compareOriginalSize').textContent = originalSize + ' KB';
+                    document.getElementById('compareOptimizedSize').textContent = optimizedSize + ' KB';
+                    document.getElementById('compareRatio').textContent = ratio + '%';
+                    document.getElementById('compareSaved').textContent = saved + ' KB';
+
+                    document.getElementById('compareOriginalRes').textContent = data.original.resolution;
+                    document.getElementById('compareOptimizedRes').textContent = data.optimized.resolution;
+
+                    document.getElementById('compareModal').classList.add('active');
+                })
+                .catch(error => {
+                    console.error('Error fetching comparison:', error);
+                    alert('Failed to load comparison data');
+                });
+        }
+
+        function closeCompareModal() {
+            document.getElementById('compareModal').classList.remove('active');
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const videoModal = document.getElementById('videoModal');
+            const compareModal = document.getElementById('compareModal');
+
+            if (event.target === videoModal) {
+                closeVideoModal();
+            }
+            if (event.target === compareModal) {
+                closeCompareModal();
+            }
         }
 
         // Auto-refresh every 30 seconds

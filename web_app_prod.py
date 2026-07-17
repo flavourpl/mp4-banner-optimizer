@@ -434,6 +434,126 @@ def admin_files():
     return jsonify(files)
 
 
+@app.route('/admin/preview/<job_id>', methods=['GET'])
+def admin_preview(job_id):
+    """Generate video preview/thumbnail for admin panel."""
+    output_dir = app.config['OUTPUT_FOLDER']
+    upload_dir = app.config['UPLOAD_FOLDER']
+
+    # Determine which file to preview (output or upload)
+    output_file = os.path.join(output_dir, f"{job_id}_optimized.mp4")
+    upload_file = os.path.join(upload_dir, f"{job_id}_*.mp4")
+
+    # Prefer output file, fallback to upload
+    if os.path.exists(output_file):
+        video_file = output_file
+    else:
+        # Find upload file
+        import glob
+        upload_files = glob.glob(upload_file)
+        if upload_files:
+            video_file = upload_files[0]
+        else:
+            return jsonify({'error': 'Video file not found'}), 404
+
+    # Generate thumbnail if not exists
+    thumbnail_dir = os.path.join(app.config['REPORT_FOLDER'], 'thumbnails')
+    os.makedirs(thumbnail_dir, exist_ok=True)
+    thumbnail_path = os.path.join(thumbnail_dir, f"{job_id}_thumb.jpg")
+
+    if not os.path.exists(thumbnail_path):
+        try:
+            # Use FFmpeg to generate thumbnail
+            import subprocess
+            ffmpeg_path = os.environ.get('FFMPEG_PATH', 'ffmpeg')
+            result = subprocess.run([
+                ffmpeg_path, '-i', video_file,
+                '-ss', '00:00:01', '-vframes', '1',
+                '-vf', 'scale=320:180',
+                '-y', thumbnail_path
+            ], capture_output=True, text=True)
+
+            if result.returncode != 0:
+                # Fallback: use placeholder
+                return jsonify({
+                    'thumbnail': None,
+                    'video_url': f'/api/download/{job_id}',
+                    'error': 'Could not generate thumbnail'
+                })
+        except Exception as e:
+            return jsonify({'error': f'Thumbnail generation failed: {str(e)}'}), 500
+
+    # Return thumbnail info
+    return jsonify({
+        'thumbnail_url': f'/admin/thumbnail/{job_id}',
+        'video_url': f'/api/download/{job_id}',
+        'exists': True
+    })
+
+
+@app.route('/admin/thumbnail/<job_id>', methods=['GET'])
+def admin_thumbnail(job_id):
+    """Serve video thumbnail."""
+    thumbnail_dir = os.path.join(app.config['REPORT_FOLDER'], 'thumbnails')
+    thumbnail_path = os.path.join(thumbnail_dir, f"{job_id}_thumb.jpg")
+
+    if os.path.exists(thumbnail_path):
+        return send_file(thumbnail_path, mimetype='image/jpeg')
+    else:
+        # Return default placeholder
+        return jsonify({'error': 'Thumbnail not found'}), 404
+
+
+@app.route('/admin/compare/<job_id>', methods=['GET'])
+def admin_compare(job_id):
+    """Compare original vs optimized video."""
+    upload_dir = app.config['UPLOAD_FOLDER']
+    output_dir = app.config['OUTPUT_FOLDER']
+
+    # Find files
+    output_file = os.path.join(output_dir, f"{job_id}_optimized.mp4")
+
+    import glob
+    upload_files = glob.glob(os.path.join(upload_dir, f"{job_id}_*.mp4"))
+
+    if not os.path.exists(output_file) or not upload_files:
+        return jsonify({'error': 'Files not found for comparison'}), 404
+
+    upload_file = upload_files[0]
+
+    # Get file info
+    original_size = os.path.getsize(upload_file) / 1024
+    optimized_size = os.path.getsize(output_file) / 1024
+    compression_ratio = ((original_size - optimized_size) / original_size) * 100
+
+    # Get video duration for comparison
+    try:
+        from mp4_optimizer.probe import probe_video
+        original_info = probe_video(upload_file)
+        optimized_info = probe_video(output_file)
+
+        return jsonify({
+            'original': {
+                'size_kb': round(original_size, 2),
+                'duration_s': original_info.get('duration_s', 0),
+                'resolution': original_info.get('resolution', 'Unknown'),
+                'fps': original_info.get('fps', 0)
+            },
+            'optimized': {
+                'size_kb': round(optimized_size, 2),
+                'duration_s': optimized_info.get('duration_s', 0),
+                'resolution': optimized_info.get('resolution', 'Unknown'),
+                'fps': optimized_info.get('fps', 0)
+            },
+            'compression': {
+                'ratio_percent': round(compression_ratio, 2),
+                'saved_kb': round(original_size - optimized_size, 2)
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': f'Comparison failed: {str(e)}'}), 500
+
+
 if __name__ == '__main__':
     # Production configuration for Progreso.pl
     port = int(os.environ.get('PORT', 5000))

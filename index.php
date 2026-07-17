@@ -36,6 +36,24 @@ function debug_log($message) {
 }
 
 /**
+ * Serve static files (thumbnails, etc.)
+ */
+function serve_static_file($file_path) {
+    if (!file_exists($file_path)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'File not found']);
+        return;
+    }
+
+    $mime_type = mime_content_type($file_path);
+    header("Content-Type: $mime_type");
+    header('Content-Length: ' . filesize($file_path));
+
+    readfile($file_path);
+    exit();
+}
+
+/**
  * Determine target URL for backend
  */
 function get_target_url() {
@@ -152,6 +170,12 @@ function proxy_request($target_url, $method = 'GET', $post_data = null, $files =
  * Main request handling
  */
 try {
+    // Serve static files for thumbnails
+    if (preg_match('#^/admin/thumbnail/#', $_SERVER['REQUEST_URI'])) {
+        $thumbnail_file = __DIR__ . '/reports/thumbnails/' . basename($_SERVER['REQUEST_URI']);
+        serve_static_file($thumbnail_file);
+    }
+
     // Check admin access for /admin routes
     if (strpos($_SERVER['REQUEST_URI'], '/admin') === 0) {
         // Simple password protection for admin panel
