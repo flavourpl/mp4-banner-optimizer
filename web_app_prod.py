@@ -12,6 +12,7 @@ import time
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 import sys
+from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -28,6 +29,15 @@ if os.path.exists(os.path.expanduser('~/bin/ffmpeg')):
     os.environ['FFPROBE_PATH'] = os.path.expanduser('~/bin/ffprobe')
 
 app = Flask(__name__)
+
+# Add custom timestamp filter
+@app.template_filter('timestamp_format')
+def timestamp_format(timestamp):
+    """Format Unix timestamp to readable date/time"""
+    if timestamp:
+        dt = datetime.fromtimestamp(timestamp)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+    return 'N/A'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max upload
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'outputs'
@@ -165,7 +175,13 @@ def run_optimization(job_id):
 
 @app.route('/')
 def index():
-    """Main page."""
+    """Portal page with links to main app and admin panel."""
+    return render_template('portal.html')
+
+
+@app.route('/app')
+def main_app():
+    """Main application page."""
     return render_template('index.html')
 
 
@@ -305,6 +321,117 @@ def download_report(job_id):
         as_attachment=True,
         download_name=f"report_{job_id}.json"
     )
+
+
+@app.route('/admin/uploads', methods=['GET'])
+def admin_uploads():
+    """Admin panel showing complete upload history."""
+    upload_dir = app.config['UPLOAD_FOLDER']
+    output_dir = app.config['OUTPUT_FOLDER']
+    report_dir = app.config['REPORT_FOLDER']
+
+    # Get all upload files
+    uploads = []
+    try:
+        for file in os.listdir(upload_dir):
+            if file.endswith('.mp4'):
+                file_path = os.path.join(upload_dir, file)
+                job_id = file.split('_')[0]
+
+                # Get file info
+                size_kb = os.path.getsize(file_path) / 1024
+                upload_time = os.path.getmtime(file_path)
+
+                # Check if processing was completed
+                output_file = os.path.join(output_dir, f"{job_id}_optimized.mp4")
+                report_file = os.path.join(report_dir, f"{job_id}_report.json")
+
+                has_output = os.path.exists(output_file)
+                has_report = os.path.exists(report_file)
+
+                # Get output size if available
+                output_size_kb = 0
+                if has_output:
+                    output_size_kb = os.path.getsize(output_file) / 1024
+
+                # Read report data if available
+                report_data = None
+                if has_report:
+                    try:
+                        import json
+                        with open(report_file, 'r') as f:
+                            report_data = json.load(f)
+                    except:
+                        pass
+
+                uploads.append({
+                    'job_id': job_id,
+                    'filename': file,
+                    'size_kb': round(size_kb, 2),
+                    'upload_time': upload_time,
+                    'has_output': has_output,
+                    'output_size_kb': round(output_size_kb, 2) if has_output else 0,
+                    'has_report': has_report,
+                    'report_data': report_data
+                })
+
+        # Sort by upload time (newest first)
+        uploads.sort(key=lambda x: x['upload_time'], reverse=True)
+
+    except Exception as e:
+        return f"Error loading uploads: {str(e)}", 500
+
+    return render_template('admin_uploads.html', uploads=uploads)
+
+
+@app.route('/admin/files', methods=['GET'])
+def admin_files():
+    """Direct file listing API endpoint."""
+    upload_dir = app.config['UPLOAD_FOLDER']
+    output_dir = app.config['OUTPUT_FOLDER']
+    report_dir = app.config['REPORT_FOLDER']
+
+    files = {
+        'uploads': [],
+        'outputs': [],
+        'reports': []
+    }
+
+    try:
+        # List uploads
+        for file in os.listdir(upload_dir):
+            if file.endswith('.mp4'):
+                file_path = os.path.join(upload_dir, file)
+                files['uploads'].append({
+                    'name': file,
+                    'size_kb': round(os.path.getsize(file_path) / 1024, 2),
+                    'modified': os.path.getmtime(file_path)
+                })
+
+        # List outputs
+        for file in os.listdir(output_dir):
+            if file.endswith('.mp4'):
+                file_path = os.path.join(output_dir, file)
+                files['outputs'].append({
+                    'name': file,
+                    'size_kb': round(os.path.getsize(file_path) / 1024, 2),
+                    'modified': os.path.getmtime(file_path)
+                })
+
+        # List reports
+        for file in os.listdir(report_dir):
+            if file.endswith('.json'):
+                file_path = os.path.join(report_dir, file)
+                files['reports'].append({
+                    'name': file,
+                    'size_kb': round(os.path.getsize(file_path) / 1024, 2),
+                    'modified': os.path.getmtime(file_path)
+                })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    return jsonify(files)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Upload History</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .stat-card h3 {
+            font-size: 2em;
+            color: #1e3c72;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #1e3c72;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9em;
+            margin-right: 5px;
+            transition: background 0.3s;
+        }
+
+        .btn-primary {
+            background: #1e3c72;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2a5298;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 0.85em;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .file-info {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .timestamp {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .compression-ratio {
+            font-weight: 600;
+            color: #28a745;
+        }
+
+        .no-uploads {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .refresh-btn {
+            background: #1e3c72;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .refresh-btn:hover {
+            background: #2a5298;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .pagination button:hover {
+            background: #f5f5f5;
+        }
+
+        .pagination button.active {
+            background: #1e3c72;
+            color: white;
+            border-color: #1e3c72;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Admin Panel - Upload History</h1>
+            <p>Complete history of all uploaded files and processing results</p>
+            <button class="refresh-btn" onclick="location.reload()">🔄 Refresh</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>{{ uploads|length }}</h3>
+                <p>Total Uploads</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ uploads|selectattr('has_output')|list|length }}</h3>
+                <p>Processed Successfully</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ uploads|rejectattr('has_output')|list|length }}</h3>
+                <p>Pending/Failed</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ uploads|selectattr('has_report')|list|length }}</h3>
+                <p>Reports Generated</p>
+            </div>
+        </div>
+
+        <div class="table-container">
+            {% if uploads %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Job ID</th>
+                        <th>Filename</th>
+                        <th>Upload Time</th>
+                        <th>File Size</th>
+                        <th>Output Size</th>
+                        <th>Compression</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for upload in uploads %}
+                    <tr>
+                        <td><code>{{ upload.job_id[:8] }}...</code></td>
+                        <td>{{ upload.filename }}</td>
+                        <td class="timestamp">{{ upload.upload_time|timestamp_format }}</td>
+                        <td>{{ upload.size_kb }} KB</td>
+                        <td>
+                            {% if upload.has_output %}
+                                {{ upload.output_size_kb }} KB
+                            {% else %}
+                                <span class="file-info">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if upload.has_output and upload.size_kb > 0 %}
+                                {% set ratio = ((upload.size_kb - upload.output_size_kb) / upload.size_kb * 100) %}
+                                <span class="compression-ratio">{{ ratio|round(1) }}%</span>
+                            {% else %}
+                                <span class="file-info">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if upload.has_output %}
+                                <span class="status-badge status-success">✅ Complete</span>
+                            {% else %}
+                                <span class="status-badge status-pending">⏳ Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if upload.has_output %}
+                                <a href="/api/download/{{ upload.job_id }}" class="btn btn-success btn-small">📥 Download</a>
+                            {% endif %}
+                            {% if upload.has_report %}
+                                <a href="/api/report/{{ upload.job_id }}" class="btn btn-info btn-small">📊 Report</a>
+                            {% endif %}
+                            {% if upload.report_data and upload.report_data.get('iterations') %}
+                                <button class="btn btn-primary btn-small" onclick="showDetails('{{ upload.job_id }}')">🔍 Details</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if uploads|length > 50 %}
+            <div class="pagination">
+                <button>« Previous</button>
+                <button class="active">1</button>
+                <button>2</button>
+                <button>3</button>
+                <button>Next »</button>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="no-uploads">
+                <h3>📭 No uploads yet</h3>
+                <p>Upload history will appear here once files are processed.</p>
+                <a href="/" class="btn btn-primary">Go to Main App</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function showDetails(jobId) {
+            const url = `/api/report/${jobId}`;
+            window.open(url, '_blank');
+        }
+
+        // Auto-refresh every 30 seconds
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>

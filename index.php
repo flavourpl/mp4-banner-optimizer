@@ -2,6 +2,7 @@
 /**
  * MP4 Banner Optimizer - PHP Bridge
  * Proxies requests between frontend and Python Flask backend
+ * Updated with admin panel support
  */
 
 // Error reporting for debugging
@@ -13,6 +14,7 @@ ini_set('error_log', __DIR__ . '/php_bridge.log');
 // Backend configuration
 define('BACKEND_URL', 'http://127.0.0.1:5000');
 define('REQUEST_TIMEOUT', 300); // 5 minutes for video processing
+define('ADMIN_PASSWORD', 'admin123'); // Simple password protection for admin panel
 
 // CORS headers
 header('Access-Control-Allow-Origin: *');
@@ -150,6 +152,21 @@ function proxy_request($target_url, $method = 'GET', $post_data = null, $files =
  * Main request handling
  */
 try {
+    // Check admin access for /admin routes
+    if (strpos($_SERVER['REQUEST_URI'], '/admin') === 0) {
+        // Simple password protection for admin panel
+        if (!isset($_SERVER['PHP_AUTH_USER']) ||
+            $_SERVER['PHP_AUTH_USER'] !== 'admin' ||
+            !isset($_SERVER['PHP_AUTH_PW']) ||
+            $_SERVER['PHP_AUTH_PW'] !== ADMIN_PASSWORD) {
+
+            header('WWW-Authenticate: Basic realm="MP4 Optimizer Admin"');
+            header('HTTP/1.0 401 Unauthorized');
+            echo json_encode(['error' => 'Authentication required']);
+            exit();
+        }
+    }
+
     $target_url = get_target_url();
     $method = $_SERVER['REQUEST_METHOD'];
 
