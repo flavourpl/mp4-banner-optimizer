@@ -1,0 +1,14 @@
+# mp4-banner-optimizer requirements
+
+# Core dependencies
+Flask>=2.0.0     # Web interface (optional, only needed for web_app.py)
+Werkzeug>=2.0.0  # Required by Flask
+
+# System requirements (not in PyPI):
+# - ffmpeg (https://ffmpeg.org/) - must be available in PATH
+# - ffprobe (comes with ffmpeg)
+
+# Development dependencies (optional)
+# pytest>=7.0.0  # for testing
+# black>=22.0.0   # for code formatting
+# pylint>=2.0.0   # for linting

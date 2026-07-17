@@ -1,130 +1,47 @@
-# PLIKI DO WGRAANIA NA PROGRESO.PL HOSTING
+# PAKIET INSTALACYJNY PROGRESO.PL
 # ==============================================
 #
-# Te pliki muszą zostać wgrane na serwer przez FTP lub SSH
-# Struktura katalogów musi zostać zachowana!
+# Kanoniczny pakiet instalacyjny: deployment/progreso/
+# Wysyłka na serwer: python3 deployment/ftp_upload.py
+# Szczegóły instalacji: deployment/progreso/INSTALL.md
 #
 # ==============================================
 
-## STRUKTURA KATALOGÓW DO UTWORZENIA:
-/public_html/ lub /www/ lub główny katalog
-├── mp4_optimizer/           (cały folder)
-├── deployment/              (tylko konkretne pliki)
-├── templates/               (cały folder)
-├── web_app_prod.py         (główny plik aplikacji)
-└── uploads/, outputs/, reports/ (utworzą się automatycznie)
+## ZAWARTOŚĆ PAKIETU (deployment/progreso/):
 
-## KONKRETNE PLIKI DO UPLOADU:
+### Pliki główne:
+- web_app_prod.py        — aplikacja Flask (upload, optymalizacja, admin, /api/health)
+- requirements.txt       — Flask + Werkzeug
+- passenger_wsgi.py      — entry point WSGI (opcjonalny, Passenger niewspierany)
+- .htaccess              — "Options -Indexes" (ProxyPass i tak ignorowany przez Progreso)
+- start.sh               — start/restart: dirs, kill starych, nohup PORT=5000, health check
+- verify.sh              — szybka weryfikacja: proces, port, /api/health, /api/presets
+- INSTALL.md             — pełna instrukcja instalacji krok po kroku
 
-### 1. Główny katalog (root):
-- web_app_prod.py
-- requirements.txt
+### mp4_optimizer/ (9 modułów):
+- __init__.py, probe.py, ladder.py, encoder.py, report.py,
+  config.py, bitrate_calc.py, ffmpeg_config.py, cli.py
 
-### 2. Folder mp4_optimizer/ (cały folder):
-- __init__.py
-- encoder.py
-- probe.py
-- ladder.py
-- report.py
-- config.py
-- ffmpeg_config.py
-- bitrate_calc.py
-- cli.py
+### templates/ (3 szablony):
+- index.html             — główna aplikacja (/app) z badge LIVE/OFFLINE
+- admin_uploads.html     — panel admina (/admin/uploads) z badge LIVE/OFFLINE
+- portal.html            — strona wyboru (/)
 
-### 3. Folder deployment/ (tylko te pliki):
-- start_progreso.sh         (ważny: musi być executable)
-- verify_deployment.py
-- gunicorn_config.py        (jeśli używasz gunicorn)
-- wsgi.py                   (jeśli używasz gunicorn)
+## CZEGO NIE MA W PAKIECIE (świadomie):
+- templates/admin_uploads_test.html — artekat debugowy
+- web_app_prod_debug.py, web_app.py — stare/dev wersje
+- __pycache__/, *.log, uploads/, outputs/, reports/ — generowane na serwerze
+- deployment/venv/ — lokalne środowisko
+- pozostałe skrypty z deployment/ (upload_to_server.sh, deploy_vps.sh itd.)
+  — historyczne, zastąpione przez ftp_upload.py + start.sh
 
-### 4. Folder templates/ (cały folder):
-- index.html
+## UWAGA — STARE PLIKI W deployment/:
+Katalog deployment/ zawiera NIEAKTUALNE kopie (web_app_prod.py z 15:47,
+web_app.py, mp4_optimizer/, templates/index.html) z wcześniejszych prób
+wdrożenia. Nie używać — aktualny jest wyłącznie pakiet deployment/progreso/.
 
-### 5. Utworzyć katalogi (puste):
-- uploads/
-- outputs/
-- reports/
-
-## UPLOAD PRZEZ FTP:
-
-1. Zaloguj się do FTP konta Progreso.pl
-2. Idź do głównego katalogu (/public_html/ lub podobny)
-3. Wgraj pliki w tej kolejności:
-   a) mp4_optimizer/ (cały folder)
-   b) templates/ (cały folder)
-   c) deployment/start_progreso.sh, deployment/verify_deployment.py
-   d) web_app_prod.py
-   e) requirements.txt
-
-4. Ustaw permissions dla start_progreso.sh:
-   - Kliknij prawym → File permissions → 755
-
-## ALTERNATYWNY UPLOAD PRZEZ SSH:
-
-```bash
-ssh twoj_user@twoj_serwer.com
-cd /sciezka/do/glownego/katalogu
-
-# Utwórz strukturę
-mkdir -p mp4_optimizer templates uploads outputs reports deployment
-
-# Wgraj pliki (przykład z scp)
-# Z lokalnego komputera:
-scp -r mp4_optimizer/ user@serwer:/sciezka/mp4_optimizer/
-scp -r templates/ user@serwer:/sciezka/templates/
-scp web_app_prod.py user@serwer:/sciezka/
-scp deployment/start_progreso.sh user@serwer:/sciezka/deployment/
-```
-
-## AFTER UPLOAD:
-
-1. SSH na serwer:
-   ssh user@serwer.com
-
-2. Idź do katalogu z aplikacją:
-   cd /sciezka/do/katalogu
-
-3. Ustaw permissions:
-   chmod +x deployment/start_progreso.sh
-   chmod +x deployment/verify_deployment.py
-
-4. Zainstaluj FFmpeg (jeśli nie masz):
-   cd ~
-   mkdir -p bin
-   wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-   tar xf ffmpeg-release-amd64-static.tar.xz
-   mv ffmpeg-*/ffmpeg ~/bin/ffmpeg
-   mv ffmpeg-*/ffprobe ~/bin/ffprobe
-   chmod +x ~/bin/ffmpeg ~/bin/ffprobe
-
-5. Zainstaluj Python deps:
-   pip3 install --user Flask Werkzeug
-
-6. Uruchom aplikację:
-   cd deployment
-   ./start_progreso.sh
-
-7. Test w przeglądarce:
-   http://twoja-domena.com:8080
-
-## CHECKLIST:
-
-□ Wgrano mp4_optimizer/ folder
-□ Wgrano templates/ folder
-□ Wgrano web_app_prod.py
-□ Wgrano deployment/start_progreso.sh
-□ Ustawiono chmod +x dla start_progreso.sh
-□ Zainstalowano FFmpeg w ~/bin/
-□ Zainstalowano Flask/Werkzeug
-□ Utworzono uploads/, outputs/, reports/
-□ Uruchomiono aplikację
-□ Dostępna pod http://domena:8080
-
-## TROUBLESHOOTING:
-
-Jeśli coś nie działa:
-1. Sprawdź czy FFmpeg działa: ~/bin/ffmpeg -version
-2. Sprawdź Python: python3 --version
-3. Sprawdź permissions: ls -la deployment/
-4. Sprawdź logi: tail optimizer.log
-5. Test: python3 deployment/verify_deployment.py
+## SZYBKI START:
+1. python3 deployment/ftp_upload.py     # upload (hasło FTP)
+2. ssh ars_mp4_video_opt@flavour.civ.pl
+3. cd ~/mp4-video-banner-optimizer && ./start.sh
+4. ./verify.sh                          # ma pokazać status "ok"

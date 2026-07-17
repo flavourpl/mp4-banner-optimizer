@@ -16,14 +16,19 @@ cd /Users/arek/Desktop/KIMI-WORKSPACE/KIMI-DYNAMIC-ADS/KIMI-VIDEO-OPTIMIZER-400k
 python3 deployment/ftp_upload.py
 ```
 
-Files uploaded:
-- `web_app_prod.py` - Main Flask application
+The script uploads the canonical package `deployment/progreso/` (see its
+`INSTALL.md` for the full install walkthrough):
+- `web_app_prod.py` - Main Flask application (incl. `/api/health`)
 - `passenger_wsgi.py` - WSGI entry point
 - `requirements.txt` - Python dependencies
-- `.htaccess` - Apache configuration
-- `mp4_optimizer/` - Core optimization modules
-- `templates/` - HTML templates
-- `deployment/` - Deployment scripts
+- `.htaccess` - Apache configuration (`Options -Indexes`)
+- `mp4_optimizer/` - Core optimization modules (9 files)
+- `templates/` - HTML templates (index, admin_uploads, portal)
+- `start.sh`, `verify.sh` - start/restart and health-check helpers
+
+Note: stale legacy copies elsewhere in `deployment/` (old `web_app_prod.py`,
+`web_app.py`, nested `mp4_optimizer/`, `templates/`) are NOT the package —
+do not upload them.
 
 ## Step 2 - Install Dependencies
 
@@ -83,6 +88,17 @@ port = int(os.environ.get('PORT', 5000))
 
 ## Step 6 - Start Application
 
+Preferred: use the packaged helper (creates dirs, kills old instances, starts
+with nohup, checks `/api/health`):
+
+```bash
+cd ~/mp4-video-banner-optimizer
+chmod +x start.sh verify.sh
+./start.sh          # default port 5000
+```
+
+Manual equivalent:
+
 ```bash
 cd ~/mp4-video-banner-optimizer
 
@@ -112,9 +128,10 @@ FFmpeg: ~/bin/ffmpeg
 # Test locally
 curl -s http://127.0.0.1:5000/ | head -10
 curl -s http://127.0.0.1:5000/api/presets
+curl -s http://127.0.0.1:5000/api/health
 ```
 
-Should return HTML interface and JSON presets.
+Should return HTML interface, JSON presets, and `{"status":"ok", ...}` health.
 
 ## Step 8 - Progreso.pl Panel Configuration
 
