@@ -172,6 +172,18 @@ function proxy_request($target_url, $method = 'GET', $post_data = null, $files =
 try {
     // Serve static files for thumbnails
     if (preg_match('#^/admin/thumbnail/#', $_SERVER['REQUEST_URI'])) {
+        // Check auth first for thumbnails
+        if (!isset($_SERVER['PHP_AUTH_USER']) ||
+            $_SERVER['PHP_AUTH_USER'] !== 'admin' ||
+            !isset($_SERVER['PHP_AUTH_PW']) ||
+            $_SERVER['PHP_AUTH_PW'] !== ADMIN_PASSWORD) {
+
+            header('WWW-Authenticate: Basic realm="MP4 Optimizer Admin"');
+            header('HTTP/1.0 401 Unauthorized');
+            echo json_encode(['error' => 'Authentication required']);
+            exit();
+        }
+
         $thumbnail_file = __DIR__ . '/reports/thumbnails/' . basename($_SERVER['REQUEST_URI']);
         serve_static_file($thumbnail_file);
     }
