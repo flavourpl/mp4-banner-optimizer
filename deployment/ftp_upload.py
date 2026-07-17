@@ -4,7 +4,8 @@ FTP Upload Script for Progreso.pl
 Uploads the deployment/progreso/ package (MP4 Banner Optimizer).
 
 Run from the PROJECT ROOT:
-    python3 deployment/ftp_upload.py
+    python3 deployment/ftp_upload.py           # sam upload
+    python3 deployment/ftp_upload.py --clean   # najpierw wyczyść zdalny katalog aplikacji
 """
 
 import os
@@ -19,10 +20,18 @@ FTP_USER = "ars_mp4_video_opt"
 # Pakiet do wysłania (względem katalogu głównego projektu)
 PACKAGE_DIR = Path("deployment/progreso")
 
+# Nazwa katalogu aplikacji na serwerze (jeśli FTP ląduje w katalogu domowym)
+APP_DIR_NAME = "mp4-video-banner-optimizer"
+
 # Czego nie wysyłamy
 SKIP_NAMES = {".DS_Store", "Thumbs.db"}
 SKIP_DIRS = {"__pycache__"}
 
+# Czego NIGDY nie usuwamy po stronie serwera (~/bin/ffmpeg!)
+PROTECTED_NAMES = {"bin"}
+
+
+# ---------------------------------------------------------------- lokalne
 
 def collect_files(package_dir):
     """Zbierz wszystkie pliki pakietu (rekurencyjnie), ze ścieżkami względnymi."""
@@ -67,7 +76,110 @@ def chmod_remote(ftp, remote_path, mode):
         pass
 
 
+# ---------------------------------------------------------------- czyszczenie zdalne
+
+def remote_entries(ftp, path):
+    """Lista (name, is_dir) dla zdalnego katalogu. MLSD, fallback NLST."""
+    try:
+        out = []
+        for name, facts in ftp.mlsd(path, facts=["type"]):
+            if name in (".", ".."):
+                continue
+            out.append((name, facts.get("type") == "dir"))
+        return out
+    except Exception:
+        pass
+
+    # Fallback: NLST + sonda katalogowa przez cwd
+    out = []
+    try:
+        names = ftp.nlst(path)
+    except error_perm:
+        return out
+    for name in names:
+        if name.rsplit("/", 1)[-1] in (".", ".."):
+            continue
+        is_dir = False
+        try:
+            current = ftp.pwd()
+            ftp.cwd(name)
+            ftp.cwd(current)
+            is_dir = True
+        except error_perm:
+            pass
+        # NLST potrafi zwracać ścieżki z prefiksem katalogu
+        short = name[len(path):].lstrip("/") if name.startswith(path + "/") else name
+        out.append((short, is_dir))
+    return out
+
+
+def remote_walk(ftp, path):
+    """Rekurencyjny listing: zwraca (files, dirs) ze ścieżkami względnymi."""
+    files, dirs = [], []
+    for name, is_dir in remote_entries(ftp, path):
+        full = f"{path}/{name}" if path != "." else name
+        if full.split("/")[0] in PROTECTED_NAMES:
+            continue
+        if is_dir:
+            dirs.append(full)
+            sub_files, sub_dirs = remote_walk(ftp, full)
+            files.extend(sub_files)
+            dirs.extend(sub_dirs)
+        else:
+            files.append(full)
+    return files, dirs
+
+
+def clean_remote(ftp):
+    """Wyczyść zdalny katalog aplikacji (z podglądem i potwierdzeniem)."""
+    top_names = [name for name, _ in remote_entries(ftp, ".")]
+    target = APP_DIR_NAME if APP_DIR_NAME in top_names else "."
+
+    print(f"🧹 Tryb --clean: czyszczę zdalny katalog: {target!r}")
+    if target == ".":
+        print("   (FTP ląduje bezpośrednio w katalogu aplikacji)")
+    print(f"   Pomijam na wszelki wypadek: {', '.join(sorted(PROTECTED_NAMES))}")
+    print()
+
+    files, dirs = remote_walk(ftp, target)
+    if not files and not dirs:
+        print("   Katalog jest już pusty.")
+        return
+
+    print(f"   Do usunięcia: {len(files)} plików, {len(dirs)} katalogów")
+    preview = files[:15]
+    for f in preview:
+        print(f"     - {f}")
+    if len(files) > len(preview):
+        print(f"     ... i {len(files) - len(preview)} więcej")
+    print()
+
+    answer = input("❓ Potwierdź usunięcie wpisując 'yes': ").strip()
+    if answer != "yes":
+        print("❌ Przerwano - nic nie usunięto.")
+        sys.exit(1)
+
+    removed = 0
+    for f in files:
+        try:
+            ftp.delete(f)
+            removed += 1
+        except error_perm as e:
+            print(f"   ⚠️  nie mogę usunąć {f}: {e}")
+    for d in reversed(dirs):
+        try:
+            ftp.rmd(d)
+        except error_perm as e:
+            print(f"   ⚠️  nie mogę usunąć {d}: {e}")
+    print(f"   ✅ Usunięto {removed}/{len(files)} plików i katalogi")
+    print()
+
+
+# ---------------------------------------------------------------- main
+
 def main():
+    clean_mode = "--clean" in sys.argv
+
     print("🚀 Upload MP4 Banner Optimizer na Progreso.pl")
     print("=" * 60)
 
@@ -82,6 +194,8 @@ def main():
 
     print(f"📦 Pakiet: {PACKAGE_DIR} ({len(files)} plików)")
     print(f"📋 FTP: {FTP_USER}@{FTP_HOST}")
+    if clean_mode:
+        print("🧹 Tryb: --clean (najpierw czyszczenie zdalnego katalogu)")
     print()
 
     ftp_password = input("🔐 Podaj hasło FTP: ")
@@ -92,6 +206,9 @@ def main():
         ftp.login(FTP_USER, ftp_password)
         print("   ✅ Połączono")
         print()
+
+        if clean_mode:
+            clean_remote(ftp)
 
         print("📤 Upload...")
         failed = 0

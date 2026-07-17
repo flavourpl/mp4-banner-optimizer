@@ -19,7 +19,6 @@ python3 deployment/ftp_upload.py
 The script uploads the canonical package `deployment/progreso/` (see its
 `INSTALL.md` for the full install walkthrough):
 - `web_app_prod.py` - Main Flask application (incl. `/api/health`)
-- `passenger_wsgi.py` - WSGI entry point
 - `requirements.txt` - Python dependencies
 - `.htaccess` - Apache configuration (`Options -Indexes`)
 - `mp4_optimizer/` - Core optimization modules (9 files)
@@ -64,21 +63,13 @@ chmod 755 uploads outputs reports
 
 ## Step 5 - Configuration Files
 
-### passenger_wsgi.py (main directory)
-```python
-import sys
-import os
-project_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_dir)
-os.environ['FFMPEG_PATH'] = os.path.expanduser('~/bin/ffmpeg')
-os.environ['FFPROBE_PATH'] = os.path.expanduser('~/bin/ffprobe')
-from web_app_prod import app as application
-```
-
 ### .htaccess (main directory)
 ```apache
 Options -Indexes
 ```
+
+Note: `passenger_wsgi.py` was removed — Passenger is not supported on
+Progreso.pl (see Step 8). The app runs as a plain `nohup` process.
 
 ### web_app_prod.py (port configuration)
 ```python

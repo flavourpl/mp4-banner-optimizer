@@ -12,6 +12,16 @@ python3 deployment/ftp_upload.py
 
 Skrypt wysyła zawartość `deployment/progreso/` na serwer (spyta o hasło FTP).
 
+**Świeża instalacja / porządek na FTP:**
+
+```bash
+python3 deployment/ftp_upload.py --clean
+```
+
+Tryb `--clean` najpierw czyści zdalny katalog aplikacji (pokazuje listę plików
+i wymaga potwierdzenia wpisując `yes`), a potem wgrywa pakiet. Katalog `bin`
+(z FFmpeg) jest zawsze pomijany — nie trzeba nic usuwać ręcznie przez klienta FTP.
+
 Alternatywnie ręcznie (scp/rsync) — wgraj CAŁĄ zawartość `deployment/progreso/`
 do `~/mp4-video-banner-optimizer/`, zachowując strukturę katalogów.
 
