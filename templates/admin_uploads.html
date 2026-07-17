@@ -151,6 +151,25 @@
             background: #138496;
         }
 
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-warning {
+            background: #ff6b6b;
+            color: white;
+            font-weight: bold;
+        }
+
+        .btn-warning:hover {
+            background: #e55555;
+        }
+
         .btn-small {
             padding: 4px 8px;
             font-size: 0.85em;
@@ -185,8 +204,8 @@
 
         .preview-container {
             position: relative;
-            width: 100px;
-            height: 60px;
+            width: 160px;
+            height: 90px;
             background: #f0f0f0;
             border-radius: 4px;
             overflow: hidden;
@@ -195,13 +214,22 @@
         }
 
         .preview-container:hover {
-            transform: scale(1.1);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
         .preview-thumbnail {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            display: none;
+        }
+
+        .preview-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
         }
 
         .preview-placeholder {
@@ -232,18 +260,41 @@
         }
 
         .video-content {
-            max-width: 90%;
-            max-height: 90%;
             background: white;
             border-radius: 10px;
             padding: 20px;
             position: relative;
+            /* Allow natural video size */
+            max-width: 95vw;
+            max-height: 95vh;
+            overflow: auto;
         }
 
         .video-content video {
-            max-width: 100%;
-            max-height: 70vh;
             border-radius: 5px;
+            /* Display at natural size (1:1) */
+            width: auto !important;
+            height: auto !important;
+            max-width: none !important;
+            max-height: none !important;
+            object-fit: fill;
+        }
+
+        .video-content video::-webkit-media-controls {
+            display: none !important;
+        }
+
+        .video-content video::-webkit-media-controls-enclosure {
+            display: none !important;
+        }
+
+        #modalVideo {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        #modalVideo::-webkit-media-controls-panel {
+            display: none !important;
         }
 
         .close-modal {
@@ -344,6 +395,7 @@
             <h1>📊 Admin Panel - Upload History</h1>
             <p>Complete history of all uploaded files and processing results</p>
             <button class="refresh-btn" onclick="location.reload()">🔄 Refresh</button>
+            <button class="btn-warning" onclick="deleteAllEntries()" style="margin-left: 10px; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">🗑️ Delete All</button>
         </div>
 
         <div class="stats">
@@ -387,7 +439,17 @@
                         <td>
                             {% if upload.has_output %}
                                 <div class="preview-container" onclick="openVideoModal('{{ upload.job_id }}', '{{ upload.filename }}')">
-                                    <img src="/admin/thumbnail/{{ upload.job_id }}" class="preview-thumbnail" alt="Preview" onerror="this.parentElement.innerHTML='<div class=\\'preview-placeholder\\'>▶</div>'">
+                                    <video class="preview-video"
+                                           src="/api/download/{{ upload.job_id }}"
+                                           muted
+                                           loop
+                                           playsinline
+                                           onmouseenter="this.play()"
+                                           onmouseleave="this.pause();this.currentTime=0;"
+                                           preload="metadata">
+                                    </video>
+                                    <img src="/admin/thumbnail/{{ upload.job_id }}" class="preview-thumbnail" alt="Preview" onerror="handleThumbnailError(this)">
+                                    <div class="preview-placeholder" style="display:none">▶</div>
                                 </div>
                             {% else %}
                                 <div class="preview-container">
@@ -431,6 +493,7 @@
                             {% if upload.has_output %}
                                 <button class="btn btn-primary btn-small" onclick="openCompareModal('{{ upload.job_id }}')">🔄 Compare</button>
                             {% endif %}
+                            <button class="btn btn-danger btn-small" onclick="deleteEntry('{{ upload.job_id }}')">🗑️ Delete</button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -461,12 +524,20 @@
     <div id="videoModal" class="video-modal">
         <div class="video-content">
             <span class="close-modal" onclick="closeVideoModal()">&times;</span>
-            <h3 id="videoTitle">Video Preview</h3>
-            <video id="modalVideo" controls>
-                Your browser does not support the video tag.
-            </video>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 id="videoTitle" style="margin: 0;">Video Preview</h3>
+                <button class="btn btn-danger btn-small" onclick="deleteCurrentEntry()">🗑️ Delete</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button class="btn btn-primary btn-small" onclick="navigatePrev()" title="Previous (←)">◀ Prev</button>
+                <video id="modalVideo" autoplay muted loop playsinline style="width: auto; height: auto; object-fit: fill; flex: none;">
+                    Your browser does not support the video tag.
+                </video>
+                <button class="btn btn-primary btn-small" onclick="navigateNext()" title="Next (→)">Next ▶</button>
+            </div>
             <div class="video-info">
                 <p><strong>Note:</strong> This is the optimized version of the video.</p>
+                <p><strong>Navigation:</strong> Use arrow keys (← →) or buttons to browse entries</p>
             </div>
         </div>
     </div>
@@ -504,32 +575,173 @@
     </div>
 
     <script>
+        // Store all job IDs for navigation
+        let allJobIds = [];
+        let currentJobIndex = 0;
+        let currentJobId = null;
+
+        // Collect all job IDs from the table
+        function collectJobIds() {
+            const rows = document.querySelectorAll('tbody tr');
+            allJobIds = [];
+            rows.forEach(row => {
+                const previewContainer = row.querySelector('.preview-container');
+                if (previewContainer) {
+                    const onclick = previewContainer.getAttribute('onclick');
+                    if (onclick) {
+                        // Extract job ID using string parsing instead of regex
+                        const startIdx = onclick.indexOf("openVideoModal('");
+                        if (startIdx !== -1) {
+                            const afterStart = onclick.substring(startIdx + 16); // "openVideoModal('".length
+                            const endIdx = afterStart.indexOf("'");
+                            if (endIdx !== -1) {
+                                const jobId = afterStart.substring(0, endIdx);
+                                allJobIds.push(jobId);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         function showDetails(jobId) {
-            const url = `/api/report/${jobId}`;
+            const url = '/api/report/' + jobId;
             window.open(url, '_blank');
         }
 
         function openVideoModal(jobId, filename) {
+            // Collect job IDs for navigation
+            collectJobIds();
+
+            // Find current index
+            currentJobId = jobId;
+            currentJobIndex = allJobIds.indexOf(jobId);
+
             const modal = document.getElementById('videoModal');
             const video = document.getElementById('modalVideo');
             const videoTitle = document.getElementById('videoTitle');
 
-            video.src = `/api/download/${jobId}`;
+            // Clone video to remove all event listeners
+            const newVideo = video.cloneNode(true);
+            video.parentNode.replaceChild(newVideo, video);
+
+            // Get reference to new video element
+            const currentVideo = document.getElementById('modalVideo');
+
+            // Force remove controls - multiple methods
+            currentVideo.removeAttribute('controls');
+            currentVideo.controls = false;
+            Object.defineProperty(currentVideo, 'controls', {
+                get: function() { return false; },
+                set: function(val) { /* ignore */ }
+            });
+
+            currentVideo.src = '/api/download/' + jobId;
+            currentVideo.loop = true;
+            currentVideo.muted = true;
+            currentVideo.autoplay = true;
+            currentVideo.playsInline = true;
+
             videoTitle.textContent = filename;
             modal.classList.add('active');
+
+            // Add ended event listener to force loop
+            currentVideo.addEventListener('ended', function() {
+                currentVideo.currentTime = 0;
+                currentVideo.play().catch(e => console.log('Replay failed:', e));
+            });
+
+            // Force autoplay
+            currentVideo.play().catch(error => {
+                console.log('Autoplay prevented:', error);
+            });
         }
+
+        function navigateNext() {
+            if (currentJobIndex < allJobIds.length - 1) {
+                const nextJobId = allJobIds[currentJobIndex + 1];
+                // Find filename for next job
+                const nextRow = document.querySelector(`tbody tr:nth-child(${currentJobIndex + 2})`);
+                const filename = nextRow?.querySelector('td:nth-child(3)')?.textContent || 'Unknown';
+                openVideoModal(nextJobId, filename);
+            } else {
+                // Loop to beginning
+                if (allJobIds.length > 0) {
+                    const firstJobId = allJobIds[0];
+                    const firstRow = document.querySelector('tbody tr:nth-child(1)');
+                    const filename = firstRow?.querySelector('td:nth-child(3)')?.textContent || 'Unknown';
+                    openVideoModal(firstJobId, filename);
+                }
+            }
+        }
+
+        function navigatePrev() {
+            if (currentJobIndex > 0) {
+                const prevJobId = allJobIds[currentJobIndex - 1];
+                const prevRow = document.querySelector(`tbody tr:nth-child(${currentJobIndex})`);
+                const filename = prevRow?.querySelector('td:nth-child(3)')?.textContent || 'Unknown';
+                openVideoModal(prevJobId, filename);
+            } else {
+                // Loop to end
+                if (allJobIds.length > 0) {
+                    const lastJobId = allJobIds[allJobIds.length - 1];
+                    const lastRow = document.querySelector('tbody tr:last-child');
+                    const filename = lastRow?.querySelector('td:nth-child(3)')?.textContent || 'Unknown';
+                    openVideoModal(lastJobId, filename);
+                }
+            }
+        }
+
+        function deleteCurrentEntry() {
+            if (currentJobId && confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
+                fetch('/admin/delete/' + currentJobId, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        closeVideoModal();
+                        location.reload();
+                    } else {
+                        alert('Failed to delete entry: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting entry:', error);
+                    alert('Failed to delete entry');
+                });
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            const modal = document.getElementById('videoModal');
+            if (modal.classList.contains('active')) {
+                if (event.key === 'ArrowLeft') {
+                    event.preventDefault();
+                    navigatePrev();
+                } else if (event.key === 'ArrowRight') {
+                    event.preventDefault();
+                    navigateNext();
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeVideoModal();
+                }
+            }
+        });
 
         function closeVideoModal() {
             const modal = document.getElementById('videoModal');
             const video = document.getElementById('modalVideo');
 
-            modal.classList.remove('active');
             video.pause();
+            video.currentTime = 0;
             video.src = '';
+            modal.classList.remove('active');
         }
 
         function openCompareModal(jobId) {
-            fetch(`/admin/compare/${jobId}`)
+            fetch('/admin/compare/' + jobId)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -560,6 +772,62 @@
 
         function closeCompareModal() {
             document.getElementById('compareModal').classList.remove('active');
+        }
+
+        // Handle thumbnail loading gracefully - show video instead
+        function handleThumbnailError(img) {
+            img.style.display = 'none';
+            const video = img.previousElementSibling;
+            if (video && video.tagName === 'VIDEO') {
+                video.style.display = 'block';
+            }
+        }
+
+        // Delete entry with confirmation
+        function deleteEntry(jobId) {
+            if (confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
+                fetch('/admin/delete/' + jobId, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Failed to delete entry: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting entry:', error);
+                    alert('Failed to delete entry');
+                });
+            }
+        }
+
+        // Delete all entries with double confirmation
+        function deleteAllEntries() {
+            const firstConfirm = confirm('⚠️ WARNING: This will delete ALL uploads and history!');
+            if (firstConfirm) {
+                const secondConfirm = confirm('🚨 Are you REALLY sure? This action cannot be undone and will permanently delete:\n\n• All uploaded files\n• All optimized files\n• All reports\n• All thumbnails\n\nThis will completely reset the system.');
+                if (secondConfirm) {
+                    fetch('/admin/delete-all', {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('✅ All entries deleted successfully!');
+                            location.reload();
+                        } else {
+                            alert('Failed to delete all entries: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error deleting all entries:', error);
+                        alert('Failed to delete all entries');
+                    });
+                }
+            }
         }
 
         // Close modals when clicking outside

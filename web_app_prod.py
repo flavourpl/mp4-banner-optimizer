@@ -9,7 +9,7 @@ import json
 import uuid
 import threading
 import time
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, make_response
 from werkzeug.utils import secure_filename
 import sys
 from datetime import datetime
@@ -49,6 +49,17 @@ for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.con
 
 # Store job status in memory
 jobs = {}
+
+
+@app.after_request
+def add_no_cache_headers(response):
+    """Add no-cache headers to prevent browser caching."""
+    # Don't cache video files or other static content
+    if response.content_type and 'text/html' in response.content_type:
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
 
 
 class OptimizationJob:
@@ -227,7 +238,7 @@ def upload_file():
 
     # Get optimization options
     options = {
-        'preset': request.form.get('preset', 'med'),
+        'preset': request.form.get('preset', 'high'),
         'max_kb': int(request.form.get('max_kb')) if request.form.get('max_kb') else None,
         'fit_mode': request.form.get('fit_mode', 'crop'),
         'keep_audio': request.form.get('keep_audio') == 'true',
@@ -292,32 +303,32 @@ def get_status(job_id):
 @app.route('/api/download/<job_id>', methods=['GET'])
 def download_file(job_id):
     """Download optimized file."""
-    if job_id not in jobs:
-        return jsonify({'error': 'Job not found'}), 404
+    output_dir = app.config['OUTPUT_FOLDER']
+    output_file = os.path.join(output_dir, f"{job_id}_optimized.mp4")
 
-    job = jobs[job_id]
-    if job.status != 'completed' or not os.path.exists(job.output_path):
-        return jsonify({'error': 'File not ready'}), 404
+    # Check if file exists (works even after server restart)
+    if not os.path.exists(output_file):
+        return jsonify({'error': 'File not found'}), 404
 
     return send_file(
-        job.output_path,
+        output_file,
         as_attachment=True,
-        download_name=f"optimized_{os.path.basename(job.input_path)}"
+        download_name=f"optimized_{job_id}.mp4"
     )
 
 
 @app.route('/api/report/<job_id>', methods=['GET'])
 def download_report(job_id):
     """Download optimization report."""
-    if job_id not in jobs:
-        return jsonify({'error': 'Job not found'}), 404
+    report_dir = app.config['REPORT_FOLDER']
+    report_file = os.path.join(report_dir, f"{job_id}_report.json")
 
-    job = jobs[job_id]
-    if job.status != 'completed' or not os.path.exists(job.report_path):
-        return jsonify({'error': 'Report not ready'}), 404
+    # Check if file exists (works even after server restart)
+    if not os.path.exists(report_file):
+        return jsonify({'error': 'Report not found'}), 404
 
     return send_file(
-        job.report_path,
+        report_file,
         as_attachment=True,
         download_name=f"report_{job_id}.json"
     )
@@ -333,10 +344,15 @@ def admin_uploads():
     # Get all upload files
     uploads = []
     try:
+
         for file in os.listdir(upload_dir):
             if file.endswith('.mp4'):
                 file_path = os.path.join(upload_dir, file)
-                job_id = file.split('_')[0]
+                # Extract job_id from filename (handle UUID format)
+                # Filename format: {job_id}_{timestamp}_{random}.mp4 or similar
+                parts = file.replace('.mp4', '').split('_')
+                job_id = parts[0] if len(parts) > 1 else file.replace('.mp4', '')
+
 
                 # Get file info
                 size_kb = os.path.getsize(file_path) / 1024
@@ -374,6 +390,23 @@ def admin_uploads():
                     'has_report': has_report,
                     'report_data': report_data
                 })
+
+                # Auto-generate thumbnail if output exists but thumbnail doesn't
+                if has_output:
+                    thumbnail_path = os.path.join(report_dir, 'thumbnails', f"{job_id}_thumb.jpg")
+                    if not os.path.exists(thumbnail_path):
+                        try:
+                            os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
+                            import subprocess
+                            ffmpeg_path = os.environ.get('FFMPEG_PATH', 'ffmpeg')
+                            subprocess.run([
+                                ffmpeg_path, '-i', output_file,
+                                '-ss', '00:00:01', '-vframes', '1',
+                                '-vf', 'scale=320:180',
+                                '-y', thumbnail_path
+                            ], capture_output=True, timeout=10)
+                        except:
+                            pass  # Silently fail if thumbnail generation fails
 
         # Sort by upload time (newest first)
         uploads.sort(key=lambda x: x['upload_time'], reverse=True)
@@ -552,6 +585,100 @@ def admin_compare(job_id):
         })
     except Exception as e:
         return jsonify({'error': f'Comparison failed: {str(e)}'}), 500
+
+
+@app.route('/admin/delete/<job_id>', methods=['DELETE'])
+def admin_delete(job_id):
+    """Delete upload entry and all associated files."""
+    try:
+        upload_dir = app.config['UPLOAD_FOLDER']
+        output_dir = app.config['OUTPUT_FOLDER']
+        report_dir = app.config['REPORT_FOLDER']
+
+        # Find and remove upload file
+        import glob
+        upload_files = glob.glob(os.path.join(upload_dir, f"{job_id}_*.mp4"))
+        for upload_file in upload_files:
+            os.remove(upload_file)
+
+        # Remove output file
+        output_file = os.path.join(output_dir, f"{job_id}_optimized.mp4")
+        if os.path.exists(output_file):
+            os.remove(output_file)
+
+        # Remove report file
+        report_file = os.path.join(report_dir, f"{job_id}_report.json")
+        if os.path.exists(report_file):
+            os.remove(report_file)
+
+        # Remove thumbnail
+        thumbnail_file = os.path.join(report_dir, 'thumbnails', f"{job_id}_thumb.jpg")
+        if os.path.exists(thumbnail_file):
+            os.remove(thumbnail_file)
+
+        # Remove from jobs dictionary if present
+        if job_id in jobs:
+            del jobs[job_id]
+
+        return jsonify({'success': True, 'message': 'Entry deleted successfully'})
+
+    except Exception as e:
+        return jsonify({'error': f'Delete failed: {str(e)}'}), 500
+
+
+@app.route('/admin/delete-all', methods=['DELETE'])
+def admin_delete_all():
+    """Delete all uploads, outputs, reports, and thumbnails."""
+    try:
+        upload_dir = app.config['UPLOAD_FOLDER']
+        output_dir = app.config['OUTPUT_FOLDER']
+        report_dir = app.config['REPORT_FOLDER']
+        thumbnail_dir = os.path.join(report_dir, 'thumbnails')
+
+        # Count files before deletion
+        import glob
+        upload_count = len(glob.glob(os.path.join(upload_dir, '*.mp4')))
+        output_count = len(glob.glob(os.path.join(output_dir, '*.mp4')))
+        report_count = len(glob.glob(os.path.join(report_dir, '*.json')))
+        thumbnail_count = len(glob.glob(os.path.join(thumbnail_dir, '*.jpg'))) if os.path.exists(thumbnail_dir) else 0
+
+        # Remove all upload files
+        for file in os.listdir(upload_dir):
+            if file.endswith('.mp4'):
+                os.remove(os.path.join(upload_dir, file))
+
+        # Remove all output files
+        for file in os.listdir(output_dir):
+            if file.endswith('.mp4'):
+                os.remove(os.path.join(output_dir, file))
+
+        # Remove all report files
+        for file in os.listdir(report_dir):
+            if file.endswith('.json'):
+                os.remove(os.path.join(report_dir, file))
+
+        # Remove all thumbnails
+        if os.path.exists(thumbnail_dir):
+            for file in os.listdir(thumbnail_dir):
+                if file.endswith('.jpg'):
+                    os.remove(os.path.join(thumbnail_dir, file))
+
+        # Clear all jobs from memory
+        jobs.clear()
+
+        return jsonify({
+            'success': True,
+            'message': f'All entries deleted successfully!',
+            'deleted': {
+                'uploads': upload_count,
+                'outputs': output_count,
+                'reports': report_count,
+                'thumbnails': thumbnail_count
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Delete all failed: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
