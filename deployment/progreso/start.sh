@@ -10,11 +10,13 @@ mkdir -p uploads outputs reports
 chmod 755 uploads outputs reports
 
 echo "==> Checking FFmpeg"
-if [ -x ~/bin/ffmpeg ]; then
-    echo "    ~/bin/ffmpeg: $(~/bin/ffmpeg -version 2>/dev/null | head -1)"
-else
-    echo "    WARNING: ~/bin/ffmpeg not found - see INSTALL.md step 3"
-fi
+for binary in ffmpeg ffprobe; do
+    if [ -x ~/bin/$binary ]; then
+        echo "    ~/bin/$binary: $(~/bin/$binary -version 2>/dev/null | head -1)"
+    else
+        echo "    WARNING: ~/bin/$binary not found - see INSTALL.md step 3"
+    fi
+done
 
 echo "==> Stopping old instances"
 pkill -f web_app_prod.py 2>/dev/null && sleep 1 || true

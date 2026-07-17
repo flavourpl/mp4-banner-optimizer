@@ -35,14 +35,24 @@ pip3 install --user flask werkzeug
 ## 3. FFmpeg (raz)
 
 ```bash
-ls -la ~/bin/ffmpeg   # sprawdź czy istnieje
+ls -la ~/bin/ffmpeg ~/bin/ffprobe   # sprawdź czy OBA istnieją
 
 # jeśli brak:
 mkdir -p ~/bin && cd ~/bin
-wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-release-64bit-static.tar.xz
-tar xvf ffmpeg-release-64bit-static.tar.xz
-cp ffmpeg-*/ffmpeg ffmpeg-*/ffprobe .
+wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+tar xvf ffmpeg-release-amd64-static.tar.xz
+cp ffmpeg-*/ffmpeg ffmpeg-*/ffprobe .   # OBOWIĄZKOWO oba binarki
 chmod +x ffmpeg ffprobe
+```
+
+Brakuje tylko `ffprobe`? (typowy przypadek — `/api/health` pokazuje `ffprobe: false`):
+
+```bash
+cd /tmp
+wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+tar xvf ffmpeg-release-amd64-static.tar.xz
+cp ffmpeg-*/ffprobe ~/bin/ && chmod +x ~/bin/ffprobe
+~/bin/ffprobe -version | head -1   # weryfikacja
 ```
 
 ## 4. Start
@@ -67,6 +77,30 @@ curl -s http://127.0.0.1:5000/api/presets
 
 `status: "ok"` = ffmpeg, ffprobe i katalogi działają. Od strony www:
 `http://77.65.215.8:5000/` (panel pokaże zielony badge LIVE).
+
+## 6. Dostęp przez domenę (PHP bridge)
+
+Pakiet zawiera `index.php` — mostek, który przekazuje ruch z domeny do aplikacji:
+
+```
+Przeglądarka → https://vid.flavour.pl → index.php → http://127.0.0.1:5000 → Flask
+```
+
+- Aplikacja MUSI chodzić na porcie **5000** (w `index.php`: `BACKEND_URL = http://127.0.0.1:5000`).
+- `.htaccess` z pakietu ma `DirectoryIndex index.php index.html`, więc mostek
+  wygrywa z ewentualnym starym `index.html` w docroocie (wcześniej domena
+  "fallbackowała" do cudzej strony, bo mostka tam nie było).
+- Panelowe porty 443/444/445 NIE są potrzebne (SSL, wymagają roota).
+
+Test po uploadzie:
+
+```bash
+curl -s https://vid.flavour.pl/api/health
+curl -s https://vid.flavour.pl/api/presets
+```
+
+Jeśli domena dalej pokazuje cudzy HTML: sprawdź, czy `index.php` jest
+w katalogu aplikacji (`ls -la index.php`) i zajrzyj do `php_bridge.log`.
 
 ## Utrzymanie
 

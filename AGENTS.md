@@ -47,8 +47,8 @@ ls -la ~/bin/ffmpeg
 # If missing, download static build:
 mkdir -p ~/bin
 cd ~/bin
-wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-release-64bit-static.tar.xz
-tar xvf ffmpeg-release-64bit-static.tar.xz
+wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+tar xvf ffmpeg-release-amd64-static.tar.xz
 cp ffmpeg-*/ffmpeg ffmpeg-*/ffprobe .
 chmod +x ffmpeg ffprobe
 ```
@@ -141,24 +141,28 @@ Should return HTML interface, JSON presets, and `{"status":"ok", ...}` health.
 - **SSL**: Enabled
 
 ### Current Status
-❌ **DOMAIN ACCESS NOT WORKING**
-- App works locally: `http://127.0.0.1:5000`
-- Domain returns default page: `https://vid.flavour.pl/`
-- Reverse proxy ignores `.htaccess`
-- Panel proxy cannot forward to port 5000
+✅ **DOMAIN ACCESS WORKS via PHP bridge**
+- `index.php` (in the package) proxies all requests to `http://127.0.0.1:5000`
+- Package `.htaccess` has `DirectoryIndex index.php index.html`, so the bridge
+  wins over any stray `index.html` in the docroot
+- Requires: app running on port **5000** + "Inne Skrypty: TAK" (PHP) in panel
+- Verify: `curl -s https://vid.flavour.pl/api/health`
+- Troubleshooting: `php_bridge.log` in the app dir on the server
 
-### Workarounds Attempted
+### Why direct proxying is NOT used
+- Reverse proxy ignores `.htaccess` ProxyPass
+- Panel proxy cannot forward to custom ports
+- Panel ports 443/444/445 are SSL-only and require root
+
+### Workarounds Attempted (before the bridge)
 ❌ ProxyPass in .htaccess (ignored)
 ❌ Passenger WSGI (not supported)
 ❌ FastCGI (not working)
 ❌ HTML redirect (ignored)
 ❌ iframe embed (ignored)
 
-### Current Solution
-✅ **Local operation only**
-- Application runs on port 5000
-- Accessible via: `http://77.65.215.8:5000`
-- NOT accessible via domain `https://vid.flavour.pl`
+### Fallback Access
+- Application also accessible directly via: `http://77.65.215.8:5000`
 
 ## Step 9 - Maintenance Commands
 

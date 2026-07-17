@@ -11,8 +11,9 @@
 
 ### Pliki główne:
 - web_app_prod.py        — aplikacja Flask (upload, optymalizacja, admin, /api/health)
+- index.php              — PHP bridge: https://vid.flavour.pl → http://127.0.0.1:5000
 - requirements.txt       — Flask + Werkzeug
-- .htaccess              — "Options -Indexes" (ProxyPass i tak ignorowany przez Progreso)
+- .htaccess              — "Options -Indexes" + "DirectoryIndex index.php index.html"
 - start.sh               — start/restart: dirs, kill starych, nohup PORT=5000, health check
 - verify.sh              — szybka weryfikacja: proces, port, /api/health, /api/presets
 - INSTALL.md             — pełna instrukcja instalacji krok po kroku

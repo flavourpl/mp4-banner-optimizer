@@ -24,9 +24,10 @@ from mp4_optimizer.report import OptimizationReport
 from mp4_optimizer.config import PRESETS, RESOLUTION_LADDER
 
 # Production FFmpeg configuration for Progreso.pl
-if os.path.exists(os.path.expanduser('~/bin/ffmpeg')):
-    os.environ['FFMPEG_PATH'] = os.path.expanduser('~/bin/ffmpeg')
-    os.environ['FFPROBE_PATH'] = os.path.expanduser('~/bin/ffprobe')
+for _binary, _env_key in [('ffmpeg', 'FFMPEG_PATH'), ('ffprobe', 'FFPROBE_PATH')]:
+    _path = os.path.expanduser(f'~/bin/{_binary}')
+    if os.path.exists(_path):
+        os.environ[_env_key] = _path
 
 app = Flask(__name__)
 
