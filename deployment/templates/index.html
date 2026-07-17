@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP4 Banner Optimizer - Web Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .upload-zone {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-zone:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-zone.dragover {
+            border-color: #4CAF50;
+            background: #f0fff0;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            font-size: 14px;
+            color: #999;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .options-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .option-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .option-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .option-group select,
+        .option-group input {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .option-group select:focus,
+        .option-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            flex-direction: row;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        .optimize-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .optimize-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .optimize-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-section {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .progress-bar-container {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            transition: width 0.3s ease;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .current-step {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .progress-percentage {
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .results-section {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0fff4;
+            border-radius: 10px;
+            border: 2px solid #4CAF50;
+        }
+
+        .results-section.error {
+            background: #fff0f0;
+            border-color: #f44336;
+        }
+
+        .results-section.warning {
+            background: #fff8f0;
+            border-color: #ff9800;
+        }
+
+        .results-header {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .result-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .result-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .result-value.success {
+            color: #4CAF50;
+        }
+
+        .result-value.warning {
+            color: #ff9800;
+        }
+
+        .result-value.error {
+            color: #f44336;
+        }
+
+        .video-preview {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .video-item {
+            text-align: center;
+        }
+
+        .video-item h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #666;
+        }
+
+        .video-item video {
+            width: 100%;
+            max-width: 300px;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .download-button {
+            flex: 1;
+            padding: 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .download-button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .download-button.secondary {
+            background: #2196F3;
+        }
+
+        .download-button.secondary:hover {
+            background: #0b7dda;
+        }
+
+        .iterations-history {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .iteration-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .iteration-item:last-child {
+            border-bottom: none;
+        }
+
+        .iteration-step {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .iteration-size {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .selected-file {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f0fff4;
+            border-radius: 8px;
+            border: 2px solid #4CAF50;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .file-icon {
+            font-size: 24px;
+        }
+
+        .file-details {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .file-size {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .remove-file {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .video-preview {
+                grid-template-columns: 1fr;
+            }
+
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .download-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 MP4 Banner Optimizer</h1>
+            <p>Optimize videos for HTML5 banners directly in your browser</p>
+        </div>
+
+        <div class="main-card">
+            <!-- Upload Section -->
+            <div class="upload-section">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Drag & Drop your MP4 file here</div>
+                    <div class="upload-hint">or click to browse</div>
+                </div>
+                <input type="file" class="file-input" id="fileInput" accept=".mp4">
+
+                <div class="selected-file" id="selectedFile">
+                    <div class="file-info">
+                        <div class="file-icon">🎥</div>
+                        <div class="file-details">
+                            <div class="file-name" id="fileName"></div>
+                            <div class="file-size" id="fileSize"></div>
+                        </div>
+                        <button class="remove-file" id="removeFile">Remove</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Options Section -->
+            <div class="options-section">
+                <div class="options-grid">
+                    <div class="option-group">
+                        <label>Preset:</label>
+                        <select id="presetSelect">
+                            <option value="low">Low (400 KB)</option>
+                            <option value="med" selected>Medium (450 KB)</option>
+                            <option value="high">High (500 KB)</option>
+                        </select>
+                    </div>
+
+                    <div class="option-group">
+                        <label>Custom Size (KB):</label>
+                        <input type="number" id="customSize" placeholder="Leave empty for preset">
+                    </div>
+
+                    <div class="option-group">
+                        <label>Aspect Ratio Mode:</label>
+                        <select id="fitMode">
+                            <option value="crop">Crop (fill frame)</option>
+                            <option value="pad">Pad (letterbox)</option>
+                            <option value="stretch">Stretch (distort)</option>
+                        </select>
+                    </div>
+
+                    <div class="option-group checkbox-group">
+                        <input type="checkbox" id="keepAudio">
+                        <label for="keepAudio">Keep Audio Track</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optimize Button -->
+            <button class="optimize-button" id="optimizeButton" disabled>
+                🚀 Start Optimization
+            </button>
+
+            <!-- Progress Section -->
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar">0%</div>
+                </div>
+                <div class="progress-info">
+                    <div class="current-step" id="currentStep">Initializing...</div>
+                    <div class="progress-percentage" id="progressPercentage">0%</div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section" id="resultsSection">
+                <div class="results-header" id="resultsHeader">
+                    ✅ Optimization Complete!
+                </div>
+
+                <div class="results-grid">
+                    <div class="result-item">
+                        <div class="result-label">Target Size:</div>
+                        <div class="result-value" id="targetSize">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Final Size:</div>
+                        <div class="result-value" id="finalSize">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Resolution:</div>
+                        <div class="result-value" id="finalResolution">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Size Reduction:</div>
+                        <div class="result-value" id="sizeReduction">-</div>
+                    </div>
+                </div>
+
+                <div class="video-preview" id="videoPreview">
+                    <div class="video-item">
+                        <h3>Original Video</h3>
+                        <video id="originalVideo" controls muted></video>
+                    </div>
+                    <div class="video-item">
+                        <h3>Optimized Video</h3>
+                        <video id="optimizedVideo" controls muted loop></video>
+                    </div>
+                </div>
+
+                <div class="iterations-history" id="iterationsHistory">
+                    <h4>Optimization Steps:</h4>
+                    <div id="iterationsList"></div>
+                </div>
+
+                <div class="download-buttons">
+                    <a class="download-button" id="downloadVideo">📥 Download Video</a>
+                    <a class="download-button secondary" id="downloadReport">📄 Download Report</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let currentJobId = null;
+        let statusCheckInterval = null;
+
+        // DOM Elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const selectedFileDiv = document.getElementById('selectedFile');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeFileBtn = document.getElementById('removeFile');
+        const optimizeButton = document.getElementById('optimizeButton');
+        const progressSection = document.getElementById('progressSection');
+        const progressBar = document.getElementById('progressBar');
+        const currentStep = document.getElementById('currentStep');
+        const progressPercentage = document.getElementById('progressPercentage');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsHeader = document.getElementById('resultsHeader');
+
+        // Event Listeners
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', handleDragOver);
+        uploadZone.addEventListener('dragleave', handleDragLeave);
+        uploadZone.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFileSelect);
+        removeFileBtn.addEventListener('click', clearFile);
+        optimizeButton.addEventListener('click', startOptimization);
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.mp4')) {
+                alert('Please select an MP4 file');
+                return;
+            }
+
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            selectedFileDiv.style.display = 'block';
+            uploadZone.style.display = 'none';
+            optimizeButton.disabled = false;
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            selectedFileDiv.style.display = 'none';
+            uploadZone.style.display = 'block';
+            optimizeButton.disabled = true;
+            resetUI();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function resetUI() {
+            progressSection.style.display = 'none';
+            resultsSection.style.display = 'none';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+        }
+
+        async function startOptimization() {
+            if (!selectedFile) {
+                alert('Please select a file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('preset', document.getElementById('presetSelect').value);
+
+            const customSize = document.getElementById('customSize').value;
+            if (customSize) {
+                formData.append('max_kb', customSize);
+            }
+
+            formData.append('fit_mode', document.getElementById('fitMode').value);
+            formData.append('keep_audio', document.getElementById('keepAudio').checked);
+
+            try {
+                optimizeButton.disabled = true;
+                optimizeButton.textContent = '⏳ Uploading...';
+                progressSection.style.display = 'block';
+                resultsSection.style.display = 'none';
+
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentJobId = data.job_id;
+                    optimizeButton.textContent = '⏳ Processing...';
+                    checkStatus();
+                } else {
+                    throw new Error(data.error || 'Upload failed');
+                }
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+                optimizeButton.disabled = false;
+                optimizeButton.textContent = '🚀 Start Optimization';
+                progressSection.style.display = 'none';
+            }
+        }
+
+        async function checkStatus() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`/api/status/${currentJobId}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Update progress
+                    progressBar.style.width = data.progress + '%';
+                    progressBar.textContent = data.progress + '%';
+                    currentStep.textContent = data.current_step;
+                    progressPercentage.textContent = data.progress + '%';
+
+                    // Show source info if available
+                    if (data.source_info) {
+                        document.getElementById('targetSize').textContent =
+                            data.source_info.size_kb + ' KB';
+                    }
+
+                    if (data.status === 'running') {
+                        // Continue checking
+                        statusCheckInterval = setTimeout(checkStatus, 1000);
+                    } else if (data.status === 'completed') {
+                        // Show results
+                        showResults(data);
+                    } else if (data.status === 'failed') {
+                        // Show error
+                        showError(data.error);
+                    }
+                } else {
+                    throw new Error(data.error || 'Status check failed');
+                }
+
+            } catch (error) {
+                console.error('Status check error:', error);
+                if (statusCheckInterval) {
+                    clearInterval(statusCheckInterval);
+                }
+                optimizeButton.disabled = false;
+                optimizeButton.textContent = '🚀 Start Optimization';
+            }
+        }
+
+        function showResults(data) {
+            optimizeButton.disabled = false;
+            optimizeButton.textContent = '🚀 Start Optimization';
+
+            resultsSection.style.display = 'block';
+
+            // Set class based on status
+            resultsSection.className = 'results-section';
+            if (data.result.status === 'success') {
+                resultsSection.classList.add('success');
+                resultsHeader.innerHTML = '✅ Optimization Complete!';
+            } else if (data.result.status === 'best_effort_failed') {
+                resultsSection.classList.add('warning');
+                resultsHeader.innerHTML = '⚠️ Best Effort - Could Not Meet Target';
+            }
+
+            // Update results
+            const sourceSize = data.source_info.size_kb;
+            const finalSize = data.result.final_size_kb;
+            const reduction = ((sourceSize - finalSize) / sourceSize * 100).toFixed(1);
+
+            document.getElementById('finalSize').textContent = finalSize + ' KB';
+            document.getElementById('finalResolution').textContent = data.result.final_resolution;
+            document.getElementById('sizeReduction').textContent = reduction + '%';
+
+            // Set up video previews
+            const originalVideo = document.getElementById('originalVideo');
+            const optimizedVideo = document.getElementById('optimizedVideo');
+
+            originalVideo.src = URL.createObjectURL(selectedFile);
+            optimizedVideo.src = `/api/download/${currentJobId}`;
+
+            // Show iterations
+            const iterationsList = document.getElementById('iterationsList');
+            iterationsList.innerHTML = '';
+            data.result.iterations.forEach(iteration => {
+                const div = document.createElement('div');
+                div.className = 'iteration-item';
+                div.innerHTML = `
+                    <div class="iteration-step">${iteration.step}</div>
+                    <div class="iteration-size">${iteration.size_kb} KB ${iteration.target_kbps ? '(' + iteration.target_kbps + ' kbps)' : ''}</div>
+                `;
+                iterationsList.appendChild(div);
+            });
+
+            // Set up download buttons
+            document.getElementById('downloadVideo').href = `/api/download/${currentJobId}`;
+            document.getElementById('downloadReport').href = `/api/report/${currentJobId}`;
+        }
+
+        function showError(error) {
+            optimizeButton.disabled = false;
+            optimizeButton.textContent = '🚀 Start Optimization';
+
+            resultsSection.style.display = 'block';
+            resultsSection.className = 'results-section error';
+            resultsHeader.innerHTML = '❌ Optimization Failed';
+            document.getElementById('finalSize').textContent = 'Error';
+            document.getElementById('finalResolution').textContent = 'Error';
+            document.getElementById('sizeReduction').textContent = 'Error';
+        }
+
+        // Load presets on page load
+        fetch('/api/presets')
+            .then(response => response.json())
+            .then(presets => {
+                console.log('Available presets:', presets);
+            })
+            .catch(error => console.error('Error loading presets:', error));
+    </script>
+</body>
+</html>
