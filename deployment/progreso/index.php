@@ -126,8 +126,15 @@ function proxy_request($target_url, $method = 'GET', $post_data = null, $files =
             break;
 
         case 'GET':
-        default:
             // GET request - no special handling needed
+            break;
+
+        default:
+            // DELETE, PUT, PATCH, etc. - forward the original method
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+            if ($post_data) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($post_data) ? http_build_query($post_data) : $post_data);
+            }
             break;
     }
 

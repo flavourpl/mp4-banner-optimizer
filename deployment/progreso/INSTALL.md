@@ -45,7 +45,10 @@ cp ffmpeg-*/ffmpeg ffmpeg-*/ffprobe .   # OBOWIĄZKOWO oba binarki
 chmod +x ffmpeg ffprobe
 ```
 
-Brakuje tylko `ffprobe`? (typowy przypadek — `/api/health` pokazuje `ffprobe: false`):
+Brakuje tylko `ffprobe`? (typowe przypadki: `/api/health` pokazuje `ffprobe: false`
+albo błąd optymalizacji `ffprobe: error while loading shared libraries: ...` —
+to znak, że aplikacja trafiła na zepsuty systemowy ffprobe; aplikacja preferuje
+`~/bin` przed binariami systemowymi, więc wystarczy dołożyć statyczny build):
 
 ```bash
 cd /tmp
@@ -87,9 +90,11 @@ Przeglądarka → https://vid.flavour.pl → index.php → http://127.0.0.1:5000
 ```
 
 - Aplikacja MUSI chodzić na porcie **5000** (w `index.php`: `BACKEND_URL = http://127.0.0.1:5000`).
-- `.htaccess` z pakietu ma `DirectoryIndex index.php index.html`, więc mostek
-  wygrywa z ewentualnym starym `index.html` w docroocie (wcześniej domena
-  "fallbackowała" do cudzej strony, bo mostka tam nie było).
+- `.htaccess` z pakietu ma `DirectoryIndex index.php index.html` ORAZ rewrite
+  nieistniejących ścieżek do `index.php` — bez tego drugiego działa tylko `/`,
+  a `/api/*`, `/app`, `/admin/uploads` zwracają 404 prosto z Apache.
+  Mostek wygrywa też z ewentualnym starym `index.html` w docroocie
+  (wcześniej domena "fallbackowała" do cudzej strony, bo mostka tam nie było).
 - Panelowe porty 443/444/445 NIE są potrzebne (SSL, wymagają roota).
 
 Test po uploadzie:

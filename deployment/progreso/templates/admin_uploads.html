@@ -573,7 +573,10 @@
             <span class="close-modal" onclick="closeVideoModal()">&times;</span>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 id="videoTitle" style="margin: 0;">Video Preview</h3>
-                <button class="btn btn-danger btn-small" onclick="deleteCurrentEntry()">🗑️ Delete</button>
+                <div style="display: flex; gap: 10px;">
+                    <a id="downloadCurrentBtn" class="btn btn-success btn-small" href="#" download>📥 Download</a>
+                    <button class="btn btn-danger btn-small" onclick="deleteCurrentEntry()">🗑️ Delete</button>
+                </div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <button class="btn btn-primary btn-small" onclick="navigatePrev()" title="Previous (←)">◀ Prev</button>
@@ -690,6 +693,7 @@
             currentVideo.playsInline = true;
 
             videoTitle.textContent = filename;
+            document.getElementById('downloadCurrentBtn').href = '/api/download/' + jobId;
             modal.classList.add('active');
 
             // Add ended event listener to force loop

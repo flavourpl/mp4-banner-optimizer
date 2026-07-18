@@ -29,6 +29,16 @@ for _binary, _env_key in [('ffmpeg', 'FFMPEG_PATH'), ('ffprobe', 'FFPROBE_PATH')
     if os.path.exists(_path):
         os.environ[_env_key] = _path
 
+# Prefer ~/bin binaries over system ones - the host's system ffmpeg/ffprobe
+# can be broken (e.g. missing shared libraries), the static build works.
+os.environ['PATH'] = os.path.expanduser('~/bin') + os.pathsep + os.environ.get('PATH', '')
+
+# Force UTF-8 stdio: server locales can be latin-1/ASCII, which crashes
+# print() on non-ASCII log output (optimizer logs use emojis).
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 app = Flask(__name__)
 
 # Add custom timestamp filter

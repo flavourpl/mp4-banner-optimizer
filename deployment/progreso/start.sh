@@ -22,6 +22,7 @@ echo "==> Stopping old instances"
 pkill -f web_app_prod.py 2>/dev/null && sleep 1 || true
 
 echo "==> Starting on port $PORT"
+export PYTHONIOENCODING=utf-8
 PORT=$PORT nohup python3 web_app_prod.py > optimizer.log 2>&1 &
 sleep 3
 
