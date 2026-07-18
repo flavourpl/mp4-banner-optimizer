@@ -164,8 +164,10 @@ Should return HTML interface, JSON presets, and `{"status":"ok", ...}` health.
 - Package `.htaccess` has `DirectoryIndex index.php index.html`, so the bridge
   wins over any stray `index.html` in the docroot
 - Requires: app running on port **5000** + "Inne Skrypty: TAK" (PHP) in panel
-- Whole domain is behind Basic Auth (`.htaccess` + `.htpasswd`, `admin` / `admin123`);
-  only `status.php` stays public, for uptime monitoring
+- Basic Auth (`.htaccess` + `.htpasswd`, `a` / `a`) guards the main page
+  `/` (portal) and `/admin/*`; the upload panel `/app` + `/api/*` are PUBLIC (no
+  password, so clients can upload directly), and `status.php` stays public too,
+  for uptime monitoring
 - Verify: `curl -s https://vid.flavour.pl/api/health`
 - Monitoring: `curl -s https://vid.flavour.pl/status.php` — served directly by
   Apache (bypasses the bridge), returns `{"alive":true,...}` (HTTP 200) or

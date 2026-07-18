@@ -1,15 +1,26 @@
 Options -Indexes
 DirectoryIndex index.php index.html
 
-# Hasło na całą domenę (Basic Auth). Dane logowania: admin / admin123
+# Hasło (Basic Auth) TYLKO na stronę główną vid.flavour.pl (portal) i panel admina.
+# Dane logowania: a / a
 # (zmiana hasła: htpasswd -nbB admin NOWE_HASLO > .htpasswd i upload)
-# status.php zostaje publiczny — potrzebny monitoringowi (UptimeRobot itp.)
+# Publiczne BEZ hasła: /app (panel upload) + /api/* (potrzebne panelowi do działania)
+# + status.php (monitoring, UptimeRobot itp.)
 AuthType Basic
 AuthName "MP4 Optimizer"
 AuthUserFile /home/ars/mp4-video-banner-optimizer/.htpasswd
-Require valid-user
-SetEnvIf Request_URI "^/status\.php" allow_status
-Require env allow_status
+
+SetEnvIf Request_URI "^/app" allow_public
+SetEnvIf Request_URI "^/api/" allow_public
+SetEnvIf Request_URI "^/status\.php" allow_public
+
+# REDIRECT_allow_public: po wewnętrznym rewrite do index.php Apache zmienia
+# prefiks zmiennych na REDIRECT_ — bez tego wyjątki przestałyby działać.
+<RequireAny>
+    Require env allow_public
+    Require env REDIRECT_allow_public
+    Require valid-user
+</RequireAny>
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
