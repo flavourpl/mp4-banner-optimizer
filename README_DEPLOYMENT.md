@@ -19,7 +19,7 @@ python3 deployment/ftp_upload.py
 
 ### 2. Start Application
 ```bash
-ssh ars_mp4_video_opt@flavour.civ.pl
+ssh ars@flavour.civ.pl
 cd ~/mp4-video-banner-optimizer
 PORT=5000 nohup python3 web_app_prod.py > optimizer.log 2>&1 &
 ```
@@ -55,7 +55,7 @@ curl http://127.0.0.1:5000/api/presets
 ## Technical Details
 
 **Application:** Flask + FFmpeg video optimizer  
-**Server:** ars_mp4_video_opt@flavour.civ.pl  
+**Server:** ars@flavour.civ.pl  
 **Directory:** ~/mp4-video-banner-optimizer  
 **Dependencies:** Flask, Werkzeug, FFmpeg static build  
 **Ports:** 5000 (working), 443/444/445 (blocked by SSL)

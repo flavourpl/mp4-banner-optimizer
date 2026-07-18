@@ -10,7 +10,7 @@ Enter FTP password when prompted.
 
 ### Step 2: SSH to Server
 ```bash
-ssh ars_mp4_video_opt@flavour.civ.pl
+ssh ars@flavour.civ.pl
 cd ~/mp4-video-banner-optimizer
 ```
 

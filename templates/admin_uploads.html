@@ -911,17 +911,24 @@
             };
 
             try {
-                const response = await fetch('/api/health', { cache: 'no-store' });
+                // status.php is served directly by Apache and answers even when the
+                // Python process is down; fall back to /api/health on direct Flask access.
+                let response = await fetch('/status.php', { cache: 'no-store' });
+                if (response.status === 404) {
+                    response = await fetch('/api/health', { cache: 'no-store' });
+                }
                 const data = await response.json();
 
-                if (response.ok && data.status === 'ok') {
+                if (response.ok && (data.alive === true || data.status === 'ok')) {
                     setState('live', 'LIVE', 'API OK — FFmpeg and FFprobe are working');
-                } else {
-                    const failed = Object.entries(data.checks || {})
+                } else if (data.checks) {
+                    const failed = Object.entries(data.checks)
                         .filter(([name, ok]) => !ok)
                         .map(([name]) => name)
                         .join(', ');
                     setState('issues', 'ISSUES', 'API responded but checks failed: ' + (failed || 'unknown'));
+                } else {
+                    setState('offline', 'OFFLINE', data.error || 'Backend process is not running');
                 }
             } catch (error) {
                 setState('offline', 'OFFLINE', 'No response from API — server process may be down');

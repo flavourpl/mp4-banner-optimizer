@@ -1,6 +1,6 @@
 # Instalacja na Progreso.pl — MP4 Banner Optimizer
 
-Serwer: `ars_mp4_video_opt@flavour.civ.pl` · katalog docelowy: `~/mp4-video-banner-optimizer/` · port: **5000**
+Serwer: `ars@flavour.civ.pl` · katalog docelowy: `~/mp4-video-banner-optimizer/` · port: **5000**
 
 ## 1. Upload plików
 
@@ -25,11 +25,16 @@ i wymaga potwierdzenia wpisując `yes`), a potem wgrywa pakiet. Katalog `bin`
 Alternatywnie ręcznie (scp/rsync) — wgraj CAŁĄ zawartość `deployment/progreso/`
 do `~/mp4-video-banner-optimizer/`, zachowując strukturę katalogów.
 
-## 2. Zależności Pythona (raz, po SSH)
+## 2. Zależności Pythona (raz na konto, NIE przy każdym deployu)
+
+Pakiety instalują się w katalogu domowym użytkownika (`~/.local/...`), a nie
+w katalogu aplikacji — deploy FTP ich nie nadpisuje. Potrzebne tylko przy
+pierwszej instalacji, po resecie/migracji serwera albo gdy start rzuca
+`ModuleNotFoundError`:
 
 ```bash
-ssh ars_mp4_video_opt@flavour.civ.pl
-pip3 install --user flask werkzeug
+ssh ars@flavour.civ.pl
+python3 -c "import flask" 2>/dev/null || pip3 install --user flask werkzeug
 ```
 
 ## 3. FFmpeg (raz)
@@ -58,16 +63,48 @@ cp ffmpeg-*/ffprobe ~/bin/ && chmod +x ~/bin/ffprobe
 ~/bin/ffprobe -version | head -1   # weryfikacja
 ```
 
-## 4. Start
+## 4. Start (proces w tle)
 
 ```bash
 cd ~/mp4-video-banner-optimizer
-chmod +x start.sh verify.sh
+chmod +x start.sh verify.sh watchdog.sh
 ./start.sh          # domyślnie port 5000
 ```
 
 Skrypt sam: tworzy `uploads/ outputs/ reports/`, zabija stare instancje,
-startuje przez `nohup` (log: `optimizer.log`) i sprawdza `/api/health`.
+startuje przez `nohup ... &` (log: `optimizer.log`) i sprawdza `/api/health`.
+Proces działa w tle i przeżywa wylogowanie z SSH — terminal można zamknąć.
+
+Ręczny odpowiednik (bez skryptu):
+
+```bash
+cd ~/mp4-video-banner-optimizer
+pkill -f web_app_prod.py                                    # stop starych
+PORT=5000 nohup python3 web_app_prod.py > optimizer.log 2>&1 &
+disown                                                      # nie zabijaj przy zamykaniu shella
+```
+
+Zatrzymanie / restart:
+
+```bash
+pkill -f web_app_prod.py     # stop
+./start.sh                   # start/restart
+```
+
+## 4a. Watchdog — automatyczny restart (cron)
+
+Badge LIVE na stronie nie wystarcza do monitoringu: gdy proces padnie,
+cała strona przestaje się ładować (idzie przez PHP bridge) i badge nigdy
+się nie renderuje. Zamiast tylko obserwować stan, `watchdog.sh` co minutę
+go naprawia — jeśli proces nie działa, uruchamia `./start.sh`.
+
+Instalacja (raz, na serwerze):
+
+```bash
+crontab -e
+# dopisać:
+* * * * * cd ~/mp4-video-banner-optimizer && ./watchdog.sh >> watchdog.log 2>&1
+```
 
 ## 5. Weryfikacja
 
@@ -81,6 +118,22 @@ curl -s http://127.0.0.1:5000/api/presets
 `status: "ok"` = ffmpeg, ffprobe i katalogi działają. Od strony www:
 `http://77.65.215.8:5000/` (panel pokaże zielony badge LIVE).
 
+## 5a. Monitoring — status.php (odpowiada nawet na martwym backendzie)
+
+`/api/health` przechodzi przez PHP bridge, więc pada razem z procesem Pythona.
+`status.php` jest serwowany BEZPOŚREDNIO przez Apache (pomija bridge dzięki
+regule `!-f` w `.htaccess`) i odpowiada zawsze:
+
+```bash
+curl -s https://vid.flavour.pl/status.php
+# żyje:  {"alive":true,"port_open":true,"checks":{...}}      HTTP 200
+# padła: {"alive":false,"error":"backend unreachable: ..."}   HTTP 503
+```
+
+Ten URL podpinaj pod monitoring zewnętrzny (np. UptimeRobot: monitor HTTPS,
+słowo kluczowe `"alive":true`) — zadziała nawet wtedy, gdy strona się nie
+ładuje. Badge LIVE w panelu też odpytuje właśnie `/status.php`.
+
 ## 6. Dostęp przez domenę (PHP bridge)
 
 Pakiet zawiera `index.php` — mostek, który przekazuje ruch z domeny do aplikacji:
@@ -89,6 +142,9 @@ Pakiet zawiera `index.php` — mostek, który przekazuje ruch z domeny do aplika
 Przeglądarka → https://vid.flavour.pl → index.php → http://127.0.0.1:5000 → Flask
 ```
 
+- Cała domena jest za hasłem (Basic Auth w `.htaccess` + `.htpasswd`): `admin` / `admin123`.
+  Zmiana hasła: `htpasswd -nbB admin NOWE_HASLO > .htpasswd` (w `deployment/progreso/`) i upload.
+  Panel `/admin/uploads` NIE ma już osobnego hasła. Bez hasła zostaje tylko `status.php`.
 - Aplikacja MUSI chodzić na porcie **5000** (w `index.php`: `BACKEND_URL = http://127.0.0.1:5000`).
 - `.htaccess` z pakietu ma `DirectoryIndex index.php index.html` ORAZ rewrite
   nieistniejących ścieżek do `index.php` — bez tego drugiego działa tylko `/`,

@@ -3,7 +3,7 @@
 ## Emergency Recovery After Server Reset
 
 ### Prerequisites
-- SSH access: `ars_mp4_video_opt@flavour.civ.pl`
+- SSH access: `ars@flavour.civ.pl`
 - FTP access for file uploads
 - Domain: `vid.flavour.pl` → `/home/ars/mp4-video-banner-optimizer/`
 - Working directory: `~/mp4-video-banner-optimizer/`
@@ -24,6 +24,9 @@ The script uploads the canonical package `deployment/progreso/` (see its
 - `mp4_optimizer/` - Core optimization modules (9 files)
 - `templates/` - HTML templates (index, admin_uploads, portal)
 - `start.sh`, `verify.sh` - start/restart and health-check helpers
+- `status.php` - health check served directly by Apache; answers even when the
+  Python process is down (unlike `/api/health`, which dies with the bridge)
+- `watchdog.sh` - cron watchdog: restarts the process when it is not running
 
 Note: stale legacy copies elsewhere in `deployment/` (old `web_app_prod.py`,
 `web_app.py`, nested `mp4_optimizer/`, `templates/`) are NOT the package —
@@ -113,6 +116,21 @@ Output folder: outputs
 FFmpeg: ~/bin/ffmpeg
 ```
 
+Both variants run the process in the background — it survives SSH logout
+(`nohup` + `&`; add `disown` if the shell kills background jobs on exit).
+
+### Auto-restart via cron (recommended)
+The in-page LIVE badge only works while the site itself loads — when the
+process is down, the PHP bridge serves nothing and the badge never renders.
+So instead of watching the badge, let cron restart the process every minute:
+
+```bash
+chmod +x watchdog.sh
+crontab -e
+# add:
+# * * * * * cd ~/mp4-video-banner-optimizer && ./watchdog.sh >> watchdog.log 2>&1
+```
+
 ## Step 7 - Verify Local Operation
 
 ```bash
@@ -146,7 +164,13 @@ Should return HTML interface, JSON presets, and `{"status":"ok", ...}` health.
 - Package `.htaccess` has `DirectoryIndex index.php index.html`, so the bridge
   wins over any stray `index.html` in the docroot
 - Requires: app running on port **5000** + "Inne Skrypty: TAK" (PHP) in panel
+- Whole domain is behind Basic Auth (`.htaccess` + `.htpasswd`, `admin` / `admin123`);
+  only `status.php` stays public, for uptime monitoring
 - Verify: `curl -s https://vid.flavour.pl/api/health`
+- Monitoring: `curl -s https://vid.flavour.pl/status.php` — served directly by
+  Apache (bypasses the bridge), returns `{"alive":true,...}` (HTTP 200) or
+  `{"alive":false,...}` (HTTP 503) even when the Python process is down;
+  use this URL for external monitors (e.g. UptimeRobot keyword `"alive":true`)
 - Troubleshooting: `php_bridge.log` in the app dir on the server
 
 ### Why direct proxying is NOT used
@@ -235,7 +259,7 @@ pip3 install --user -r requirements.txt
 
 ## Contact & Support
 
-- **Server**: ars_mp4_video_opt@flavour.civ.pl
+- **Server**: ars@flavour.civ.pl
 - **Domain**: vid.flavour.pl
 - **Local URL**: http://77.65.215.8:5000
 - **Project**: MP4 Banner Optimizer with FFmpeg video processing

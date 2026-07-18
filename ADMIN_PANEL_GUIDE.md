@@ -14,10 +14,13 @@ https://vid.flavour.pl/admin/uploads
 
 ## 🔐 Autoryzacja
 
+Panel NIE ma już własnego hasła — cała domena `vid.flavour.pl` jest chroniona
+na poziomie `.htaccess` (Basic Auth), więc logujesz się raz na całą stronę:
+
 **Login:** `admin`
 **Hasło:** `admin123`
 
-*(Można zmienić w `index.php` linia 12: `define('ADMIN_PASSWORD', 'twoje_haslo');`)*
+*(Zmiana hasła: `htpasswd -nbB admin NOWE_HASLO > deployment/progreso/.htpasswd` i upload.)*
 
 ## 📊 Funkcje Panelu Admin
 
@@ -63,20 +66,20 @@ Panel admin jest w pełni responsywny i działa na urządzeniach mobilnych.
 
 ## 🔧 Konfiguracja
 
-### Zmiana hasła admin:
-```php
-// W index.php linia 12:
-define('ADMIN_PASSWORD', 'twoje_nowe_haslo');
+### Zmiana hasła domeny:
+```bash
+# lokalnie, z katalogu głównego projektu:
+htpasswd -nbB admin NOWE_HASLO > deployment/progreso/.htpasswd
+python3 deployment/ftp_upload.py   # upload
 ```
 
 ### Wyłączenie autoryzacji (niezalecane):
-```php
-// W index.php zakomentuj sekcję autoryzacji:
-/*
-if (strpos($_SERVER['REQUEST_URI'], '/admin') === 0) {
-    // ... kod autoryzacji ...
-}
-*/
+```apache
+# W deployment/progreso/.htaccess zakomentuj blok:
+# AuthType Basic
+# AuthName "MP4 Optimizer"
+# AuthUserFile /home/ars/mp4-video-banner-optimizer/.htpasswd
+# Require valid-user
 ```
 
 ## 🚀 Bezpieczeństwo
@@ -125,7 +128,7 @@ curl -u admin:admin123 https://vid.flavour.pl/admin/files
 - Wróć do głównej aplikacji i wgraj plik testowy
 
 ### Błędy autoryzacji:
-- Sprawdź czy hasło zostało zmienione w `index.php`
+- Sprawdź czy hasło zostało zmienione w `.htpasswd`
 - Wyczyść cache przeglądarki i spróbuj ponownie
 
 ---

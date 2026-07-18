@@ -12,10 +12,13 @@
 ### Pliki główne:
 - web_app_prod.py        — aplikacja Flask (upload, optymalizacja, admin, /api/health)
 - index.php              — PHP bridge: https://vid.flavour.pl → http://127.0.0.1:5000
+- status.php             — health check niezależny od bridge (HTTP 200/503; do monitoringu)
 - requirements.txt       — Flask + Werkzeug
-- .htaccess              — "Options -Indexes" + "DirectoryIndex index.php index.html"
+- .htaccess              — "Options -Indexes", DirectoryIndex + Basic Auth całej domeny (status.php publiczny)
+- .htpasswd              — hasło domeny: admin / admin123 (bcrypt; zmiana: htpasswd -nbB)
 - start.sh               — start/restart: dirs, kill starych, nohup PORT=5000, health check
 - verify.sh              — szybka weryfikacja: proces, port, /api/health, /api/presets
+- watchdog.sh            — cron: restartuje proces, gdy nie działa (co minutę)
 - INSTALL.md             — pełna instrukcja instalacji krok po kroku
 
 ### mp4_optimizer/ (9 modułów):
@@ -42,6 +45,6 @@ wdrożenia. Nie używać — aktualny jest wyłącznie pakiet deployment/progres
 
 ## SZYBKI START:
 1. python3 deployment/ftp_upload.py     # upload (hasło FTP)
-2. ssh ars_mp4_video_opt@flavour.civ.pl
+2. ssh ars@flavour.civ.pl
 3. cd ~/mp4-video-banner-optimizer && ./start.sh
 4. ./verify.sh                          # ma pokazać status "ok"

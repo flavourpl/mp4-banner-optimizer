@@ -17,6 +17,9 @@ from pathlib import Path
 FTP_HOST = "flavour.civ.pl"
 FTP_USER = "ars_mp4_video_opt"
 
+# Konto SSH jest INNE niż FTP (używane tylko w podpowiedzi po uploadzie)
+SSH_USER = "ars"
+
 # Pakiet do wysłania (względem katalogu głównego projektu)
 PACKAGE_DIR = Path("deployment/progreso")
 
@@ -233,12 +236,20 @@ def main():
         print()
         print("Co teraz? (szczegóły: deployment/progreso/INSTALL.md)")
         print()
-        print(f"  ssh {FTP_USER}@{FTP_HOST}")
+        print(f"  ssh {SSH_USER}@{FTP_HOST}               # SSH: {SSH_USER} (NIE login FTP!)")
         print("  cd ~/mp4-video-banner-optimizer")
-        print("  pip3 install --user flask werkzeug   # raz")
-        print("  chmod +x start.sh verify.sh")
-        print("  ./start.sh                            # start na porcie 5000")
-        print("  ./verify.sh                           # sprawdzenie /api/health")
+        print('  python3 -c "import flask" 2>/dev/null || pip3 install --user flask werkzeug')
+        print("                  # pakiety Pythona są na koncie, NIE w katalogu appki — FTP ich nie rusza")
+        print("  chmod +x start.sh verify.sh watchdog.sh")
+        print("  ./start.sh        # start w tle na porcie 5000 (przeżywa wylogowanie)")
+        print("  ./verify.sh       # proces + /api/health")
+        print()
+        print("  Watchdog (raz) — cron co minutę podnosi proces, gdy padnie:")
+        print("    crontab -e")
+        print("    * * * * * cd ~/mp4-video-banner-optimizer && ./watchdog.sh >> watchdog.log 2>&1")
+        print()
+        print("  Monitoring niezależny od procesu (odpowiada nawet, gdy padł):")
+        print('    curl -s https://vid.flavour.pl/status.php   # {"alive":true,...} = OK')
         print()
 
     except Exception as e:

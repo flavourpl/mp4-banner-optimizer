@@ -446,7 +446,7 @@ curl http://localhost:8000/api/presets
 python3 deployment/ftp_upload.py
 
 # 2. Start services on server
-ssh ars_mp4_video_opt@flavour.civ.pl
+ssh ars@flavour.civ.pl
 cd ~/mp4-video-banner-optimizer
 chmod +x start_bridge.sh
 ./start_bridge.sh

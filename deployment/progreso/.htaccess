@@ -1,6 +1,16 @@
 Options -Indexes
 DirectoryIndex index.php index.html
 
+# Hasło na całą domenę (Basic Auth). Dane logowania: admin / admin123
+# (zmiana hasła: htpasswd -nbB admin NOWE_HASLO > .htpasswd i upload)
+# status.php zostaje publiczny — potrzebny monitoringowi (UptimeRobot itp.)
+AuthType Basic
+AuthName "MP4 Optimizer"
+AuthUserFile /home/ars/mp4-video-banner-optimizer/.htpasswd
+Require valid-user
+SetEnvIf Request_URI "^/status\.php" allow_status
+Require env allow_status
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{REQUEST_FILENAME} !-f
